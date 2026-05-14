@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Generate PWA Icons</title>
+  <style>
+    body { font-family: system-ui; padding: 20px; max-width: 800px; margin: 0 auto; }
+    .icon-preview { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 20px; margin-top: 20px; }
+    .icon-item { text-align: center; padding: 15px; border: 1px solid #ddd; border-radius: 8px; }
+    canvas { border: 1px solid #eee; border-radius: 8px; }
+    button { padding: 10px 20px; background: #4f46e5; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 16px; margin: 10px 5px; }
+    button:hover { background: #3730a3; }
+    .info { background: #f0f9ff; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #4f46e5; }
+  </style>
+</head>
+<body>
+  <h1>🎨 สร้างไอคอน PWA</h1>
+  
+  <div class="info">
+    <strong>คำแนะนำ:</strong> คลิกปุ่ม "สร้างไอคอนทั้งหมด" เพื่อสร้างไอคอนทุกขนาด จากนั้นคลิก "ดาวน์โหลดทั้งหมด" เพื่อบันทึกไฟล์
+  </div>
+
+  <div>
+    <button onclick="generateAllIcons()">🎨 สร้างไอคอนทั้งหมด</button>
+    <button onclick="downloadAll()">💾 ดาวน์โหลดทั้งหมด</button>
+  </div>
+
+  <div class="icon-preview" id="preview"></div>
+
+  <script>
+    const sizes = [72, 96, 128, 144, 152, 192, 384, 512];
+    const canvases = {};
+
+    function generateIcon(size) {
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+
+      // Background gradient
+      const gradient = ctx.createLinearGradient(0, 0, size, size);
+      gradient.addColorStop(0, '#4f46e5');
+      gradient.addColorStop(1, '#7c3aed');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, size, size);
+
+      // School emoji
+      ctx.font = `${size * 0.5}px Arial`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('🏫', size / 2, size / 2);
+
+      return canvas;
+    }
+
+    function generateAllIcons() {
+      const preview = document.getElementById('preview');
+      preview.innerHTML = '';
+
+      sizes.forEach(size => {
+        const canvas = generateIcon(size);
+        canvases[size] = canvas;
+
+        const item = document.createElement('div');
+        item.className = 'icon-item';
+        item.innerHTML = `
+          <canvas width="${size}" height="${size}" style="width: 100px; height: 100px;"></canvas>
+          <div style="margin-top: 10px; font-size: 14px; font-weight: 600;">${size}x${size}</div>
+          <button onclick="downloadIcon(${size})" style="font-size: 12px; padding: 5px 10px; margin-top: 5px;">ดาวน์โหลด</button>
+        `;
+
+        const displayCanvas = item.querySelector('canvas');
+        const displayCtx = displayCanvas.getContext('2d');
+        displayCtx.drawImage(canvas, 0, 0, size, size, 0, 0, 100, 100);
+
+        preview.appendChild(item);
+      });
+    }
+
+    function downloadIcon(size) {
+      const canvas = canvases[size];
+      if (!canvas) return;
+
+      canvas.toBlob(blob => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `icon-${size}x${size}.png`;
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+    }
+
+    function downloadAll() {
+      sizes.forEach((size, index) => {
+        setTimeout(() => downloadIcon(size), index * 200);
+      });
+    }
+
+    // Auto-generate on load
+    window.addEventListener('load', generateAllIcons);
+  </script>
+</body>
+</html>

@@ -1,0 +1,44 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4f46e5;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#7c3aed;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="512" height="512" fill="url(#grad)" rx="80"/>
+  
+  <!-- School Building -->
+  <g transform="translate(256, 256)">
+    <!-- Main Building -->
+    <rect x="-120" y="-80" width="240" height="160" fill="white" opacity="0.95" rx="8"/>
+    
+    <!-- Roof -->
+    <path d="M -140,-80 L 0,-120 L 140,-80 Z" fill="white" opacity="0.95"/>
+    
+    <!-- Flag -->
+    <rect x="-5" y="-140" width="10" height="60" fill="white" opacity="0.9"/>
+    <path d="M 5,-140 L 5,-120 L 35,-130 Z" fill="#ef4444"/>
+    
+    <!-- Windows Row 1 -->
+    <rect x="-90" y="-50" width="35" height="35" fill="#4f46e5" opacity="0.3" rx="4"/>
+    <rect x="-40" y="-50" width="35" height="35" fill="#4f46e5" opacity="0.3" rx="4"/>
+    <rect x="10" y="-50" width="35" height="35" fill="#4f46e5" opacity="0.3" rx="4"/>
+    <rect x="60" y="-50" width="35" height="35" fill="#4f46e5" opacity="0.3" rx="4"/>
+    
+    <!-- Windows Row 2 -->
+    <rect x="-90" y="0" width="35" height="35" fill="#4f46e5" opacity="0.3" rx="4"/>
+    <rect x="-40" y="0" width="35" height="35" fill="#4f46e5" opacity="0.3" rx="4"/>
+    <rect x="10" y="0" width="35" height="35" fill="#4f46e5" opacity="0.3" rx="4"/>
+    <rect x="60" y="0" width="35" height="35" fill="#4f46e5" opacity="0.3" rx="4"/>
+    
+    <!-- Door -->
+    <rect x="-25" y="45" width="50" height="35" fill="#4f46e5" opacity="0.5" rx="4"/>
+    <circle cx="10" cy="62" r="3" fill="white" opacity="0.8"/>
+    
+    <!-- Checkmark Badge -->
+    <circle cx="80" cy="-60" r="35" fill="#16a34a"/>
+    <path d="M 65,-60 L 75,-50 L 95,-70" stroke="white" stroke-width="8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

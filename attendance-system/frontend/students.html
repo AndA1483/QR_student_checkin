@@ -4,6 +4,18 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>จัดการนักเรียน – ระบบเช็กชื่อนักเรียน</title>
+  <!-- PWA Meta Tags -->
+  <meta name="description" content="ระบบเช็กชื่อนักเรียนสำหรับครูผู้สอน">
+  <meta name="theme-color" content="#4f46e5">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="เช็กชื่อ">
+  
+  <!-- PWA Icons -->
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" type="image/png" sizes="192x192" href="/assets/icons/icon-192x192.png">
+  <link rel="apple-touch-icon" href="/assets/icons/icon-192x192.png">
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/style.css">
@@ -851,5 +863,8 @@ function downloadTemplate() {
   URL.revokeObjectURL(url);
 }
 </script>
+
+<!-- PWA Install Script -->
+<script src="/pwa-install.js"></script>
 </body>
 </html>
