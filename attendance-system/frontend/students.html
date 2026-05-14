@@ -331,11 +331,19 @@ async function onClassChange() {
 async function loadStudents() {
   const classId = getSelectedClassId('class-filter');
   const q = classQuery(classId);
+  
+  // Show loading state
+  document.getElementById('loading-state').style.display = 'block';
+  document.getElementById('empty-state').style.display = 'none';
+  
   try {
     allStudents = await apiFetch(`/students${q}`);
     renderStudents(allStudents);
   } catch (e) {
-    showToast('โหลดข้อมูลไม่สำเร็จ', 'error');
+    console.error('Load students error:', e);
+    document.getElementById('loading-state').style.display = 'none';
+    document.getElementById('empty-state').style.display = 'block';
+    showToast('โหลดข้อมูลไม่สำเร็จ: ' + e.message, 'error');
   }
 }
 
@@ -611,6 +619,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   const urlClassId = getUrlClassId();
   if (urlClassId) document.getElementById('class-filter').value = urlClassId;
   onClassChange();
+  
+  // Load students on page load
+  loadStudents();
 });
 
 // ══════════════════════════════════════════════════════════════════════════
