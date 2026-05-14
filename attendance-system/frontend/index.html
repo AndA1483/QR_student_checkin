@@ -369,19 +369,34 @@ function adjustChartGrid() {
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
+  // Wait for app.js to load currentUser
   await new Promise(r => setTimeout(r, 150));
+  
+  // If currentUser is still null, wait a bit more
+  let retries = 0;
+  while (!currentUser && retries < 10) {
+    await new Promise(r => setTimeout(r, 100));
+    retries++;
+  }
+  
+  // If still no currentUser, redirect to login
+  if (!currentUser) {
+    window.location.href = '/login.html';
+    return;
+  }
+  
   document.getElementById('welcome-title').textContent = `ยินดีต้อนรับ ${currentUser?.full_name || ''} 👋`;
   renderMyClasses();
 
   // For teacher: pre-populate class selector with only their classes
-  if (currentUser.role === 'admin') {
+  if (currentUser?.role === 'admin') {
     await populateClassSelect('class-filter', 'ทุกชั้นเรียน');
   } else {
     const sel = document.getElementById('class-filter');
     sel.innerHTML = '<option value="">— ทุกชั้นของฉัน —</option>';
     const myClasses = new Map();
-    (currentUser.homerooms || []).forEach(h => myClasses.set(h.class_id, h));
-    (currentUser.subjects  || []).forEach(s => myClasses.set(s.class_id, s));
+    (currentUser?.homerooms || []).forEach(h => myClasses.set(h.class_id, h));
+    (currentUser?.subjects  || []).forEach(s => myClasses.set(s.class_id, s));
     const byGrade = {};
     myClasses.forEach(c => { if (!byGrade[c.grade]) byGrade[c.grade] = []; byGrade[c.grade].push(c); });
     Object.entries(byGrade).sort().forEach(([grade, list]) => {
