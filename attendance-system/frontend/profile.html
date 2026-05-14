@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ตั้งค่าการสอน – ระบบเช็กชื่อนักเรียน</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">🏫</div>
+      <div class="logo-text"><h2>ระบบเช็กชื่อ</h2><span>นักเรียน</span></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-title">เมนูหลัก</div>
+      <a href="index.html"      class="nav-item"><span class="nav-icon">📊</span> Dashboard</a>
+      <a href="attendance.html" class="nav-item"><span class="nav-icon">✅</span> เช็กชื่อ</a>
+      <a href="report.html"     class="nav-item"><span class="nav-icon">📋</span> รายงาน</a>
+      <div class="nav-section-title">จัดการ</div>
+      <a href="classes.html"    class="nav-item admin-only" style="display:none"><span class="nav-icon">🏛️</span> จัดการชั้นเรียน</a>
+      <a href="students.html"   class="nav-item"><span class="nav-icon">👨‍🎓</span> จัดการนักเรียน</a>
+      <a href="qrcode.html"     class="nav-item"><span class="nav-icon">📷</span> QR Code</a>
+
+      <div class="nav-section-title">บัญชีของฉัน</div>
+      <a href="profile.html"    class="nav-item active"><span class="nav-icon">⚙️</span> ตั้งค่าการสอน</a>
+    </nav>
+    <div class="user-panel">
+      <div class="user-avatar-circle" id="user-avatar">?</div>
+      <div class="user-info">
+        <div class="u-name" id="user-name">กำลังโหลด...</div>
+        <div class="u-role" id="user-role"></div>
+      </div>
+      <button class="logout-btn" onclick="logout()" title="ออกจากระบบ">🚪</button>
+    </div>
+  </aside>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <div class="main-content">
+    <header class="top-header">
+      <div class="header-left">
+        <button class="menu-toggle" id="menu-toggle">☰</button>
+        <div class="page-title">
+          <h1>⚙️ ตั้งค่าการสอน</h1>
+          <p>เลือกรายวิชาและห้องเรียนที่สอน + ห้องประจำชั้น</p>
+        </div>
+      </div>
+      <div class="header-right"><span class="header-date" id="header-date"></span></div>
+    </header>
+
+    <main class="page-content">
+      <div id="loading-state" class="loading"><div class="spinner"></div> กำลังโหลด...</div>
+      <div id="main-content" style="display:none">
+
+        <!-- Homeroom section -->
+        <div class="card" style="margin-bottom:20px">
+          <div class="card-header">
+            <span class="card-title">🏠 ห้องประจำชั้น (Homeroom)</span>
+            <div style="display:flex;align-items:center;gap:10px">
+              <span style="font-size:13px;color:var(--gray-500)">เลือกห้องที่เป็นครูประจำชั้น</span>
+              <button class="btn btn-outline btn-sm" onclick="clearHomeroom()" title="ล้างการเลือกห้องประจำชั้น">🔄 รีเซ็ต</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="class-checkbox-grid" id="homeroom-grid"></div>
+          </div>
+        </div>
+
+        <!-- Subject sections -->
+        <div id="subject-sections"></div>
+
+        <!-- Save button -->
+        <div style="display:flex;justify-content:flex-end;gap:12px;margin-top:8px">
+          <button class="btn btn-outline" onclick="loadAssignments()">↩️ รีเซ็ต</button>
+          <button class="btn btn-primary btn-lg" onclick="saveAssignments()">💾 บันทึกการตั้งค่า</button>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script src="assets/js/app.js"></script>
+<script>
+let allClasses = [];
+let allSubjects = [];
+let selectedSubjectClasses = {};
+let selectedHomerooms = new Set();
+
+// ── Detect if admin is editing another user ────────────────────────────────
+function getTargetUserId() {
+  return new URLSearchParams(window.location.search).get('user_id') || 'me';
+}
+
+async function init() {
+  await new Promise(r => setTimeout(r, 200)); // wait for app.js
+
+  const targetId = getTargetUserId();
+  const isEditingOther = targetId !== 'me' && currentUser?.role === 'admin';
+
+  // Update page header if editing another user
+  if (isEditingOther) {
+    try {
+      const targetUser = await apiFetch(`/users/${targetId}/assignments`);
+      // Get user info
+      const users = await apiFetch('/users');
+      const u = users.find(x => String(x.id) === String(targetId));
+      if (u) {
+        document.querySelector('.page-title h1').textContent = `⚙️ ตั้งค่าการสอน: ${u.full_name}`;
+        document.querySelector('.page-title p').textContent = `กำลังแก้ไขสิทธิ์ของ ${u.username}`;
+        // Add back button
+        document.querySelector('.header-right').insertAdjacentHTML('afterbegin',
+          `<a href="users.html" class="btn btn-outline btn-sm" style="margin-right:8px">← กลับ</a>`);
+      }
+    } catch(e) {}
+  }
+
+  [allClasses, allSubjects] = await Promise.all([loadClasses(), loadSubjects()]);
+  renderSubjectSections();
+  renderHomeroomGrid();
+  await loadAssignments();
+  document.getElementById('loading-state').style.display = 'none';
+  document.getElementById('main-content').style.display = 'block';
+}
+
+function renderHomeroomGrid() {
+  const grid = document.getElementById('homeroom-grid');
+  // Group by grade
+  const byGrade = {};
+  allClasses.forEach(c => { if (!byGrade[c.grade]) byGrade[c.grade] = []; byGrade[c.grade].push(c); });
+  grid.innerHTML = Object.entries(byGrade).sort().map(([grade, list]) =>
+    list.sort((a,b) => Number(a.room)-Number(b.room)).map(c =>
+      `<label class="class-checkbox-item" id="hr-${c.id}" onclick="selectHomeroom(event,${c.id})">
+        <input type="radio" name="homeroom" value="${c.id}">
+        <span>🏠 ${c.class_code}</span>
+      </label>`
+    ).join('')
+  ).join('');
+}
+
+// Homeroom = radio (เลือกได้แค่ 1 ห้อง)
+function selectHomeroom(e, classId) {
+  e.preventDefault(); // กัน radio input fire ซ้ำ
+  const already = selectedHomerooms.has(classId);
+  // ล้างทุกห้องก่อน
+  selectedHomerooms.forEach(id => {
+    document.getElementById(`hr-${id}`)?.classList.remove('checked');
+  });
+  selectedHomerooms.clear();
+  if (!already) {
+    // เลือกห้องใหม่
+    selectedHomerooms.add(classId);
+    document.getElementById(`hr-${classId}`)?.classList.add('checked');
+  }
+}
+
+function clearHomeroom() {
+  selectedHomerooms.forEach(id => {
+    document.getElementById(`hr-${id}`)?.classList.remove('checked');
+  });
+  selectedHomerooms.clear();
+}
+
+function renderSubjectSections() {
+  const container = document.getElementById('subject-sections');
+  // Group classes by grade for display
+  const byGrade = {};
+  allClasses.forEach(c => { if (!byGrade[c.grade]) byGrade[c.grade] = []; byGrade[c.grade].push(c); });
+
+  container.innerHTML = allSubjects.map(s => {
+    selectedSubjectClasses[s.id] = selectedSubjectClasses[s.id] || new Set();
+    const classItems = Object.entries(byGrade).sort().map(([grade, list]) =>
+      list.sort((a,b) => Number(a.room)-Number(b.room)).map(c =>
+        `<label class="class-checkbox-item" id="sc-${s.id}-${c.id}" onclick="toggleSubjectClass(event,${s.id},${c.id})">
+          <input type="checkbox">
+          <span>${c.class_code}</span>
+        </label>`
+      ).join('')
+    ).join('');
+
+    return `<div class="card" style="margin-bottom:16px">
+      <div class="card-header">
+        <span class="card-title">
+          <span style="background:${s.color}22;color:${s.color};padding:4px 12px;border-radius:20px;font-size:14px;font-weight:700">${s.icon} ${s.subject_name}</span>
+        </span>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-outline btn-sm" onclick="selectAllSubject(${s.id})">เลือกทั้งหมด</button>
+          <button class="btn btn-outline btn-sm" onclick="clearSubject(${s.id})">ล้าง</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="class-checkbox-grid">${classItems}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleSubjectClass(e, subjectId, classId) {
+  e.preventDefault(); // กัน checkbox input fire ซ้ำ
+  const set = selectedSubjectClasses[subjectId];
+  const el = document.getElementById(`sc-${subjectId}-${classId}`);
+  if (set.has(classId)) { set.delete(classId); el?.classList.remove('checked'); }
+  else { set.add(classId); el?.classList.add('checked'); }
+}
+
+function selectAllSubject(subjectId) {
+  allClasses.forEach(c => {
+    selectedSubjectClasses[subjectId].add(c.id);
+    document.getElementById(`sc-${subjectId}-${c.id}`)?.classList.add('checked');
+  });
+}
+
+function clearSubject(subjectId) {
+  selectedSubjectClasses[subjectId].clear();
+  allClasses.forEach(c => document.getElementById(`sc-${subjectId}-${c.id}`)?.classList.remove('checked'));
+}
+
+async function loadAssignments() {
+  const targetId = getTargetUserId();
+  const url = targetId === 'me' ? '/users/me/assignments' : `/users/${targetId}/assignments`;
+  const data = await apiFetch(url);
+
+  // Reset UI
+  selectedHomerooms.clear();
+  allSubjects.forEach(s => { selectedSubjectClasses[s.id] = new Set(); });
+  document.querySelectorAll('.class-checkbox-item').forEach(el => el.classList.remove('checked'));
+
+  // Apply homerooms
+  data.homerooms.forEach(h => {
+    selectedHomerooms.add(h.class_id);
+    document.getElementById(`hr-${h.class_id}`)?.classList.add('checked');
+  });
+  // Apply subject-classes
+  data.subjects.forEach(ts => {
+    if (!selectedSubjectClasses[ts.subject_id]) selectedSubjectClasses[ts.subject_id] = new Set();
+    selectedSubjectClasses[ts.subject_id].add(ts.class_id);
+    document.getElementById(`sc-${ts.subject_id}-${ts.class_id}`)?.classList.add('checked');
+  });
+}
+
+async function saveAssignments() {
+  const subject_classes = [];
+  for (const [subjectId, classSet] of Object.entries(selectedSubjectClasses)) {
+    classSet.forEach(classId => subject_classes.push({ subject_id: Number(subjectId), class_id: classId }));
+  }
+  const homeroom_class_ids = [...selectedHomerooms];
+
+  const targetId = getTargetUserId();
+  const url = targetId === 'me' ? '/users/me/assignments' : `/users/${targetId}/assignments`;
+
+  try {
+    await apiFetch(url, { method: 'POST', body: JSON.stringify({ subject_classes, homeroom_class_ids }) });
+    showToast('บันทึกการตั้งค่าเรียบร้อย', 'success');
+    _classCache = null;
+    // If admin edited another user, go back after save
+    if (targetId !== 'me' && currentUser?.role === 'admin') {
+      setTimeout(() => { window.location.href = 'users.html'; }, 1200);
+    }
+  } catch(e) {
+    showToast('บันทึกไม่สำเร็จ: ' + e.message, 'error');
+  }
+}
+
+init();
+</script>
+</body>
+</html>

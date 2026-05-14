@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>เช็กชื่อ – ระบบเช็กชื่อนักเรียน</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/style.css">
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <style>
+    .context-bar {
+      background:white;border:1px solid var(--gray-200);border-radius:var(--radius);
+      padding:14px 20px;display:flex;align-items:center;gap:12px;
+      margin-bottom:14px;flex-wrap:wrap;box-shadow:var(--shadow);
+    }
+    .context-bar label{font-weight:700;font-size:14px;color:var(--gray-700);white-space:nowrap;}
+    .context-select{
+      padding:8px 32px 8px 12px;border:1px solid var(--gray-300);border-radius:8px;
+      font-size:14px;font-family:inherit;color:var(--gray-800);background:white;
+      appearance:none;outline:none;cursor:pointer;min-width:200px;
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+      background-repeat:no-repeat;background-position:right 10px center;transition:border-color .2s;
+    }
+    .context-select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(79,70,229,.1);}
+    .date-bar{
+      background:white;border:1px solid var(--gray-200);border-radius:var(--radius);
+      padding:12px 20px;display:flex;align-items:center;gap:12px;
+      margin-bottom:14px;flex-wrap:wrap;box-shadow:var(--shadow);
+    }
+    .date-bar label{font-weight:700;font-size:14px;white-space:nowrap;}
+    .date-bar input[type="date"]{padding:8px 12px;border:1px solid var(--gray-300);border-radius:8px;font-size:14px;font-family:inherit;outline:none;}
+    .date-bar input[type="date"]:focus{border-color:var(--primary);}
+    .summary-bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
+    .summary-chip{display:flex;align-items:center;gap:6px;padding:8px 16px;border-radius:20px;font-size:14px;font-weight:700;}
+    .chip-present{background:var(--success-light);color:var(--success);}
+    .chip-absent{background:var(--danger-light);color:var(--danger);}
+    .chip-leave{background:var(--warning-light);color:var(--warning);}
+    .chip-percent{background:var(--primary-light);color:var(--primary);}
+    .attendance-table td{vertical-align:middle;}
+    .note-input{width:100%;padding:6px 10px;border:1px solid var(--gray-200);border-radius:6px;font-size:13px;font-family:inherit;outline:none;min-width:120px;}
+    .note-input:focus{border-color:var(--primary);}
+    .student-info{display:flex;align-items:center;gap:10px;}
+    .student-info .name{font-weight:600;font-size:14px;}
+    .student-info .meta{font-size:12px;color:var(--gray-500);}
+    .save-bar{
+      position:sticky;bottom:0;background:white;border-top:1px solid var(--gray-200);
+      padding:14px 24px;display:flex;align-items:center;justify-content:space-between;
+      gap:12px;box-shadow:0 -4px 12px rgba(0,0,0,.06);flex-wrap:wrap;
+    }
+    .save-bar .save-info{font-size:13px;color:var(--gray-500);}
+    .prompt-state{text-align:center;padding:48px 24px;color:var(--gray-400);}
+    .prompt-state .ps-icon{font-size:48px;margin-bottom:12px;}
+    .class-card-btn {
+      display:flex;flex-direction:column;align-items:center;gap:6px;
+      padding:14px 20px;background:white;border:2px solid var(--gray-200);
+      border-radius:12px;cursor:pointer;transition:all .2s;font-family:inherit;
+      min-width:100px;text-align:center;
+    }
+    .class-card-btn:hover { border-color:var(--primary);box-shadow:0 4px 12px rgba(79,70,229,.15);transform:translateY(-2px); }
+    .class-card-btn.active { border-color:var(--primary);background:var(--primary-light);color:var(--primary); }
+    .class-card-btn.homeroom { border-color:#3b82f6; }
+    .class-card-btn.homeroom.active { background:#dbeafe;color:#1d4ed8;border-color:#1d4ed8; }
+    .class-card-code { font-size:18px;font-weight:800; }
+    .class-card-tags { font-size:11px;color:var(--gray-500);line-height:1.3; }
+    .class-card-btn.active .class-card-tags { color:var(--primary); }
+    #att-qr-reader { border-radius: 10px; overflow: hidden; border: 2px solid var(--gray-200); }
+    .qr-scan-result {
+      margin-top: 14px; padding: 14px 16px; border-radius: 10px; display: none;
+      align-items: center; gap: 12px;
+    }
+    .qr-scan-result.success { background: var(--success-light); border: 1px solid var(--success); display: flex; }
+    .qr-scan-result.error   { background: var(--danger-light);  border: 1px solid var(--danger);  display: flex; }
+    .qr-scan-result-icon { font-size: 32px; }
+    .qr-scan-result-name { font-size: 16px; font-weight: 800; }
+    .qr-scan-result-meta { font-size: 13px; color: var(--gray-600); }
+    .qr-scan-log { max-height: 220px; overflow-y: auto; }
+    .qr-scan-log-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 12px; border-bottom: 1px solid var(--gray-100); font-size: 13px;
+    }
+    .qr-scan-log-item:last-child { border-bottom: none; }
+    .qr-scan-log-time { color: var(--gray-400); white-space: nowrap; font-size: 12px; }
+    .qr-scanner-controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">🏫</div>
+      <div class="logo-text"><h2>ระบบเช็กชื่อ</h2><span>นักเรียน</span></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-title">เมนูหลัก</div>
+      <a href="index.html" class="nav-item"><span class="nav-icon">📊</span> Dashboard</a>
+      <a href="attendance.html" class="nav-item active"><span class="nav-icon">✅</span> เช็กชื่อ</a>
+      <a href="report.html" class="nav-item"><span class="nav-icon">📋</span> รายงาน</a>
+      <div class="nav-section-title">จัดการ</div>
+      <a href="classes.html" class="nav-item admin-only" style="display:none"><span class="nav-icon">🏛️</span> จัดการชั้นเรียน</a>
+      <a href="students.html" class="nav-item"><span class="nav-icon">👨‍🎓</span> ข้อมูลนักเรียน</a>
+      <a href="qrcode.html" class="nav-item"><span class="nav-icon">📷</span> QR Code</a>
+      <a href="users.html" class="nav-item admin-only" style="display:none"><span class="nav-icon">👥</span> จัดการผู้ใช้</a>
+      <div class="nav-section-title">บัญชีของฉัน</div>
+      <a href="profile.html" class="nav-item"><span class="nav-icon">⚙️</span> ตั้งค่าการสอน</a>
+    </nav>
+    <div class="user-panel">
+      <div class="user-avatar-circle" id="user-avatar">?</div>
+      <div class="user-info"><div class="u-name" id="user-name">กำลังโหลด...</div><div class="u-role" id="user-role"></div></div>
+      <button class="logout-btn" onclick="logout()" title="ออกจากระบบ">🚪</button>
+    </div>
+  </aside>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <div class="main-content">
+    <header class="top-header">
+      <div class="header-left">
+        <button class="menu-toggle" id="menu-toggle">☰</button>
+        <div class="page-title">
+          <h1>✅ เช็กชื่อนักเรียน</h1>
+          <p id="page-subtitle">บันทึกการเข้าเรียนรายวัน</p>
+        </div>
+      </div>
+      <div class="header-right"><span class="header-date" id="header-date"></span></div>
+    </header>
+
+    <main class="page-content" style="padding-bottom:0">
+      <!-- Attendance Type Selector -->
+      <div class="context-bar">
+        <label>📋 ประเภทการเช็กชื่อ:</label>
+        <select class="context-select" id="attendance-type" onchange="onAttendanceTypeChange()">
+          <option value="homeroom">🏠 ประจำชั้น</option>
+          <option value="subject">📚 รายวิชา</option>
+        </select>
+      </div>
+
+      <div id="my-classes-panel" style="display:none;margin-bottom:14px">
+        <div style="font-size:13px;font-weight:700;color:var(--gray-600);margin-bottom:10px" id="my-classes-label">🏠 ชั้นเรียนประจำชั้นของฉัน</div>
+        <div id="my-classes-grid" style="display:flex;gap:10px;flex-wrap:wrap"></div>
+      </div>
+
+      <div class="context-bar" id="admin-class-bar" style="display:none">
+        <label>🏛️ ชั้นเรียน:</label>
+        <select class="context-select" id="class-filter" onchange="onClassChange()">
+          <option value="">— เลือกชั้นเรียน —</option>
+        </select>
+        <span id="class-badge"></span>
+        <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-outline btn-sm" onclick="markAll('present')">✅ มาทุกคน</button>
+          <button class="btn btn-outline btn-sm" onclick="markAll('absent')">❌ ขาดทุกคน</button>
+        </div>
+      </div>
+      <div class="context-bar" id="selected-class-bar" style="display:none">
+        <span id="selected-class-info" style="font-size:15px;font-weight:800;color:var(--primary)"></span>
+        <span id="selected-class-tags" style="font-size:13px;color:var(--gray-500)"></span>
+        <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-outline btn-sm" onclick="markAll('present')">✅ มาทุกคน</button>
+          <button class="btn btn-outline btn-sm" onclick="markAll('absent')">❌ ขาดทุกคน</button>
+        </div>
+      </div>
+
+      <div class="context-bar" id="subject-bar" style="display:none">
+        <label>📚 เลือกวิชา:</label>
+        <div class="subject-pills" id="subject-pills"></div>
+      </div>
+
+      <div class="date-bar">
+        <label for="date-picker">📅 วันที่:</label>
+        <input type="date" id="date-picker">
+        <button class="btn btn-outline btn-sm" onclick="loadToday()">วันนี้</button>
+      </div>
+
+      <div class="summary-bar">
+        <div class="summary-chip chip-present">✅ มาเรียน: <span id="cnt-present">0</span></div>
+        <div class="summary-chip chip-absent">❌ ขาด: <span id="cnt-absent">0</span></div>
+        <div class="summary-chip chip-leave">🟡 ลา: <span id="cnt-leave">0</span></div>
+        <div class="summary-chip chip-percent">📊 เข้าเรียน: <span id="cnt-percent">0</span>%</div>
+      </div>
+
+      <div class="card" style="margin-bottom:0;border-bottom-left-radius:0;border-bottom-right-radius:0">
+        <div class="card-body" style="padding:0">
+          <div id="loading-state" class="loading" style="display:none"><div class="spinner"></div> กำลังโหลด...</div>
+          <div class="table-wrapper" id="table-wrapper" style="display:none">
+            <table class="attendance-table">
+              <thead>
+                <tr>
+                  <th style="width:40px">เลขที่</th>
+                  <th>นักเรียน</th>
+                  <th>สถานะ</th>
+                  <th>หมายเหตุ / พฤติกรรม</th>
+                  <th style="width:100px">เวลาเช็ก</th>
+                </tr>
+              </thead>
+              <tbody id="attendance-tbody"></tbody>
+            </table>
+          </div>
+          <div id="prompt-class" class="prompt-state">
+            <div class="ps-icon">🏛️</div>
+            <p style="font-size:15px;font-weight:700;margin-bottom:6px">กรุณาเลือกชั้นเรียน</p>
+            <p style="font-size:13px" id="prompt-class-text">เลือกชั้นเรียนที่ต้องการเช็กชื่อ</p>
+          </div>
+          <div id="prompt-subject" class="prompt-state" style="display:none">
+            <div class="ps-icon">📚</div>
+            <p style="font-size:15px;font-weight:700;margin-bottom:6px">กรุณาเลือกรายวิชา</p>
+            <p style="font-size:13px">เลือกวิชาที่ต้องการเช็กชื่อด้านบน</p>
+          </div>
+          <div id="prompt-empty" class="prompt-state" style="display:none">
+            <div class="ps-icon">👨‍🎓</div>
+            <p style="font-size:15px;font-weight:700">ไม่พบนักเรียนในชั้นนี้</p>
+          </div>
+          <div id="prompt-no-homeroom" class="prompt-state" style="display:none">
+            <div class="ps-icon">⚙️</div>
+            <p style="font-size:15px;font-weight:700;margin-bottom:6px" id="prompt-no-assign-title">ยังไม่มีชั้นเรียนประจำชั้น</p>
+            <p style="font-size:13px" id="prompt-no-assign-text">กรุณาติดต่อ Admin เพื่อมอบหมายชั้นเรียนประจำชั้น</p>
+            <a href="profile.html" class="btn btn-primary" style="margin-top:16px">⚙️ ตั้งค่าการสอน</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="save-bar">
+        <span class="save-info" id="save-info">เลือกชั้นเรียนและสถานะนักเรียน แล้วกดบันทึก</span>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-outline btn-lg" onclick="openQrScanner()">📷 สแกน QR</button>
+          <button class="btn btn-primary btn-lg" onclick="saveAttendance()">💾 บันทึกการเช็กชื่อ</button>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<div class="modal-overlay" id="qr-scanner-modal">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <span class="modal-title" id="qr-modal-title">📷 สแกน QR Code เช็กชื่อ</span>
+      <button class="modal-close" onclick="closeQrScanner()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="qr-scanner-controls">
+        <span style="font-size:13px;font-weight:700;color:var(--gray-600)">📅 วันที่:</span>
+        <input type="date" id="qr-scan-date" style="padding:7px 10px;border:1px solid var(--gray-300);border-radius:8px;font-size:13px;font-family:inherit;outline:none">
+        <button class="btn btn-primary btn-sm" id="qr-start-btn" onclick="startAttScanner()">📷 เปิดกล้อง</button>
+        <button class="btn btn-outline btn-sm" id="qr-stop-btn" onclick="stopAttScanner()" style="display:none">⏹️ หยุด</button>
+        <button class="btn btn-outline btn-sm" onclick="clearAttScanLog()" style="margin-left:auto">🗑️ ล้าง log</button>
+      </div>
+      <div id="qr-subject-row" style="display:none;margin-bottom:12px;padding:10px 12px;background:var(--primary-light);border-radius:8px;align-items:center;gap:10px;flex-wrap:wrap">
+        <span style="font-size:13px;font-weight:700;color:var(--primary)">📚 วิชา:</span>
+        <div id="qr-subject-pills" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+      </div>
+      <div id="att-qr-reader"></div>
+      <div class="qr-scan-result" id="qr-scan-result">
+        <span class="qr-scan-result-icon" id="qr-scan-icon">✅</span>
+        <div>
+          <div class="qr-scan-result-name" id="qr-scan-name"></div>
+          <div class="qr-scan-result-meta" id="qr-scan-meta"></div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:14px">
+        <div class="card-header" style="padding:10px 14px">
+          <span class="card-title" style="font-size:13px">📋 ประวัติการสแกน (<span id="qr-log-count">0</span> คน)</span>
+        </div>
+        <div class="card-body" style="padding:0">
+          <div class="qr-scan-log" id="qr-scan-log">
+            <div style="text-align:center;padding:20px;color:var(--gray-400);font-size:13px">ยังไม่มีการสแกน</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="assets/js/app.js"></script>
+<script>
+let students = [];
+let attendanceData = {};
+let currentClassId = null;
+let selectedSubjectId = null;
+let availableSubjects = [];
+let attendanceType = 'homeroom'; // 'homeroom' or 'subject'
+let attQrCode = null;
+let attScanLog = [];
+let attScanCooldown = false;
+let attLastScanned = '';
+let qrSelectedSubjectId = null;
+
+function showState(state) {
+  document.getElementById('loading-state').style.display = state === 'loading' ? 'flex' : 'none';
+  document.getElementById('table-wrapper').style.display = state === 'table' ? 'block' : 'none';
+  document.getElementById('prompt-class').style.display = state === 'class' ? 'block' : 'none';
+  document.getElementById('prompt-subject').style.display = state === 'subject' ? 'block' : 'none';
+  document.getElementById('prompt-empty').style.display = state === 'empty' ? 'block' : 'none';
+  document.getElementById('prompt-no-homeroom').style.display = state === 'no-homeroom' ? 'block' : 'none';
+}
+
+async function onAttendanceTypeChange() {
+  const typeValue = document.getElementById('attendance-type').value;
+  
+  // Determine if homeroom or subject
+  if (typeValue === 'homeroom') {
+    attendanceType = 'homeroom';
+    selectedSubjectId = null;
+  } else {
+    attendanceType = 'subject';
+    selectedSubjectId = parseInt(typeValue);
+  }
+  
+  students = [];
+  attendanceData = {};
+  updateSummary();
+  
+  // Update UI labels
+  if (attendanceType === 'homeroom') {
+    document.getElementById('page-subtitle').textContent = 'บันทึกการเข้าเรียนประจำชั้น';
+    document.getElementById('prompt-class-text').textContent = 'เลือกชั้นเรียนที่ต้องการเช็กชื่อประจำชั้น';
+    document.getElementById('my-classes-label').textContent = '🏠 ชั้นเรียนประจำชั้นของฉัน';
+    document.getElementById('prompt-no-assign-title').textContent = 'ยังไม่มีชั้นเรียนประจำชั้น';
+    document.getElementById('prompt-no-assign-text').textContent = 'กรุณาติดต่อ Admin เพื่อมอบหมายชั้นเรียนประจำชั้น';
+    document.getElementById('qr-modal-title').textContent = '📷 สแกน QR Code เช็กชื่อประจำชั้น';
+  } else {
+    const subjects = await loadSubjects();
+    const selectedSubject = subjects.find(s => s.id === selectedSubjectId);
+    const subjectName = selectedSubject ? `${selectedSubject.icon} ${selectedSubject.subject_name}` : 'รายวิชา';
+    document.getElementById('page-subtitle').textContent = `บันทึกการเข้าเรียน ${subjectName}`;
+    document.getElementById('prompt-class-text').textContent = `เลือกชั้นเรียนที่ต้องการเช็กชื่อ ${subjectName}`;
+    document.getElementById('my-classes-label').textContent = `📚 ชั้นเรียนที่สอน ${subjectName}`;
+    document.getElementById('prompt-no-assign-title').textContent = `ยังไม่มีชั้นเรียนที่สอน ${subjectName}`;
+    document.getElementById('prompt-no-assign-text').textContent = 'กรุณาติดต่อ Admin เพื่อมอบหมายวิชาที่สอน';
+    document.getElementById('qr-modal-title').textContent = `📷 สแกน QR Code เช็กชื่อ ${subjectName}`;
+  }
+  
+  // Reset and rebuild
+  currentClassId = null;
+  document.querySelectorAll('.class-card-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('selected-class-bar').style.display = 'none';
+  document.getElementById('subject-bar').style.display = 'none';
+  
+  if (currentUser.role === 'admin') {
+    document.getElementById('class-filter').value = '';
+    showState('class');
+  } else {
+    buildTeacherClassCards();
+  }
+}
+
+function getCurrentClassId() {
+  if (currentUser.role === 'admin') {
+    return document.getElementById('class-filter')?.value || '';
+  }
+  return currentClassId || '';
+}
+
+async function initPage() {
+  // Load subjects for dropdown
+  const subjects = await loadSubjects();
+  const typeSelect = document.getElementById('attendance-type');
+  const subjectOptions = subjects.map(s => 
+    `<option value="${s.id}">${s.icon} ${s.subject_name}</option>`
+  ).join('');
+  typeSelect.innerHTML = '<option value="homeroom">🏠 ประจำชั้น</option>' + subjectOptions;
+  
+  if (currentUser.role === 'admin') {
+    await populateClassSelect('class-filter', null);
+    document.getElementById('class-filter').insertAdjacentHTML('afterbegin', '<option value="">— เลือกชั้นเรียน —</option>');
+    document.getElementById('admin-class-bar').style.display = 'flex';
+  } else {
+    buildTeacherClassCards();
+  }
+  
+  showState('class');
+}
+
+function buildTeacherClassCards() {
+  const panel = document.getElementById('my-classes-panel');
+  const grid = document.getElementById('my-classes-grid');
+  
+  if (attendanceType === 'homeroom') {
+    const homerooms = currentUser.homerooms || [];
+    if (homerooms.length === 0) {
+      panel.style.display = 'none';
+      showState('no-homeroom');
+      return;
+    }
+    panel.style.display = 'block';
+    const byGrade = {};
+    homerooms.forEach(h => {
+      const grade = h.grade || '';
+      if (!byGrade[grade]) byGrade[grade] = [];
+      byGrade[grade].push(h);
+    });
+    let html = '';
+    Object.entries(byGrade).sort().forEach(([grade, list]) => {
+      list.sort((a,b) => Number(a.room)-Number(b.room)).forEach(c => {
+        html += `<button class="class-card-btn homeroom" id="classcard-${c.class_id}" onclick="selectClassCard(${c.class_id})">
+          <div class="class-card-code">${c.class_code}</div>
+          <div class="class-card-tags">🏠 ประจำชั้น</div>
+        </button>`;
+      });
+    });
+    grid.innerHTML = html;
+    showState('class');
+  } else {
+    // Filter classes where teacher teaches the selected subject
+    const mySubjects = (currentUser.subjects || []).filter(s => s.subject_id === selectedSubjectId);
+    if (mySubjects.length === 0) {
+      panel.style.display = 'none';
+      showState('no-homeroom');
+      return;
+    }
+    panel.style.display = 'block';
+    const classMap = new Map();
+    mySubjects.forEach(s => {
+      if (!classMap.has(s.class_id)) {
+        classMap.set(s.class_id, { ...s });
+      }
+    });
+    const byGrade = {};
+    classMap.forEach(c => {
+      const grade = c.grade || '';
+      if (!byGrade[grade]) byGrade[grade] = [];
+      byGrade[grade].push(c);
+    });
+    let html = '';
+    Object.entries(byGrade).sort().forEach(([grade, list]) => {
+      list.sort((a,b) => Number(a.room)-Number(b.room)).forEach(c => {
+        html += `<button class="class-card-btn" id="classcard-${c.class_id}" onclick="selectClassCard(${c.class_id})">
+          <div class="class-card-code">${c.class_code}</div>
+          <div class="class-card-tags">${c.icon} ${c.subject_name}</div>
+        </button>`;
+      });
+    });
+    grid.innerHTML = html;
+    showState('class');
+  }
+}
+
+async function selectClassCard(classId) {
+  classId = String(classId);
+  currentClassId = classId;
+  document.querySelectorAll('.class-card-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('classcard-' + classId)?.classList.add('active');
+
+  const classes = await loadClasses();
+  const cls = classes.find(c => String(c.id) === classId);
+  if (cls) {
+    const infoBar = document.getElementById('selected-class-bar');
+    infoBar.style.display = 'flex';
+    
+    if (attendanceType === 'homeroom') {
+      document.getElementById('selected-class-info').textContent = '🏠 ' + cls.class_code;
+      document.getElementById('selected-class-tags').textContent = 'ประจำชั้น';
+      document.getElementById('page-subtitle').textContent = 'ชั้น ' + cls.class_code + ' (ประจำชั้น)';
+    } else {
+      const subjects = await loadSubjects();
+      const selectedSubject = subjects.find(s => s.id === selectedSubjectId);
+      if (selectedSubject) {
+        document.getElementById('selected-class-info').textContent = '📚 ' + cls.class_code;
+        document.getElementById('selected-class-tags').textContent = selectedSubject.icon + ' ' + selectedSubject.subject_name;
+        document.getElementById('page-subtitle').textContent = 'ชั้น ' + cls.class_code + ' - ' + selectedSubject.icon + ' ' + selectedSubject.subject_name;
+      }
+    }
+  }
+
+  students = [];
+  attendanceData = {};
+  updateSummary();
+  
+  // Hide subject pills bar - no longer needed
+  document.getElementById('subject-bar').style.display = 'none';
+  
+  // Load attendance immediately
+  loadAttendance();
+}
+
+async function onClassChange() {
+  const classId = document.getElementById('class-filter').value;
+  students = [];
+  attendanceData = {};
+  updateSummary();
+
+  const badge = document.getElementById('class-badge');
+  if (classId) {
+    const classes = await loadClasses();
+    const cls = classes.find(c => String(c.id) === String(classId));
+    
+    if (attendanceType === 'homeroom') {
+      badge.innerHTML = cls ? '<span class="class-badge">� ' + cls.class_code + '</span>' : '';
+      document.getElementById('page-subtitle').textContent = cls ? 'ชั้น ' + cls.class_code + ' (ประจำชั้น)' : 'บันทึกการเข้าเรียนประจำชั้น';
+    } else {
+      const subjects = await loadSubjects();
+      const selectedSubject = subjects.find(s => s.id === selectedSubjectId);
+      if (selectedSubject) {
+        badge.innerHTML = cls ? '<span class="class-badge">📚 ' + cls.class_code + ' - ' + selectedSubject.icon + ' ' + selectedSubject.subject_name + '</span>' : '';
+        document.getElementById('page-subtitle').textContent = cls ? 'ชั้น ' + cls.class_code + ' - ' + selectedSubject.icon + ' ' + selectedSubject.subject_name : 'บันทึกการเข้าเรียนรายวิชา';
+      }
+    }
+    
+    // Hide subject pills bar - no longer needed
+    document.getElementById('subject-bar').style.display = 'none';
+    
+    // Load attendance immediately
+    loadAttendance();
+  } else {
+    badge.innerHTML = '';
+    if (attendanceType === 'homeroom') {
+      document.getElementById('page-subtitle').textContent = 'บันทึกการเข้าเรียนประจำชั้น';
+    } else {
+      const subjects = await loadSubjects();
+      const selectedSubject = subjects.find(s => s.id === selectedSubjectId);
+      document.getElementById('page-subtitle').textContent = selectedSubject ? `บันทึกการเข้าเรียน ${selectedSubject.icon} ${selectedSubject.subject_name}` : 'บันทึกการเข้าเรียนรายวิชา';
+    }
+    document.getElementById('subject-bar').style.display = 'none';
+    showState('class');
+  }
+}
+
+async function buildSubjectPills(classId) {
+  const bar = document.getElementById('subject-bar');
+  if (!classId) {
+    bar.style.display = 'none';
+    availableSubjects = [];
+    return;
+  }
+
+  if (currentUser.role === 'admin') {
+    const subjects = await loadSubjects();
+    availableSubjects = subjects;
+    renderPills(subjects);
+  } else {
+    const mySubjects = (currentUser.subjects || []).filter(s => String(s.class_id) === String(classId));
+    const seen = new Set();
+    availableSubjects = mySubjects.filter(s => {
+      if (seen.has(s.subject_id)) return false;
+      seen.add(s.subject_id);
+      return true;
+    });
+    renderPills(availableSubjects);
+  }
+}
+
+function renderPills(subjects) {
+  const bar = document.getElementById('subject-bar');
+  const pills = document.getElementById('subject-pills');
+  bar.style.display = 'flex';
+
+  let html = subjects.map(s => {
+    const sid = s.subject_id || s.id;
+    return `<button class="subject-pill" id="pill-${sid}" onclick="selectSubject(${sid},'${sid}')"
+      style="background:${s.color}22;color:${s.color}">${s.icon} ${s.subject_name}</button>`;
+  }).join('');
+  pills.innerHTML = html;
+}
+
+function selectSubject(subjectId, pillKey) {
+  selectedSubjectId = subjectId;
+  document.querySelectorAll('.subject-pill').forEach(p => p.classList.remove('active'));
+  document.getElementById('pill-' + pillKey)?.classList.add('active');
+
+  const sub = availableSubjects.find(s => String(s.subject_id || s.id) === String(subjectId));
+  if (sub) {
+    document.getElementById('page-subtitle').textContent = sub.icon + ' ' + sub.subject_name;
+  }
+
+  loadAttendance();
+}
+
+function loadToday() {
+  document.getElementById('date-picker').value = getTodayISO();
+  loadAttendance();
+}
+
+async function loadAttendance() {
+  const date = document.getElementById('date-picker').value;
+  const classId = getCurrentClassId();
+  if (!classId) { showState('class'); return; }
+  if (!date) return;
+
+  showState('loading');
+  try {
+    let url = '/attendance/date/' + date + '?class_id=' + classId;
+    if (attendanceType === 'subject' && selectedSubjectId) {
+      url += '&subject_id=' + selectedSubjectId;
+    }
+    const rows = await apiFetch(url);
+    students = rows;
+    attendanceData = {};
+    rows.forEach(r => {
+      attendanceData[r.student_id] = { status: r.status || '', note: r.note || '', checked_at: r.checked_at };
+    });
+    if (rows.length === 0) { showState('empty'); }
+    else { showState('table'); renderTable(); }
+    updateSummary();
+  } catch (e) {
+    showState('empty');
+    showToast('โหลดข้อมูลไม่สำเร็จ: ' + e.message, 'error');
+  }
+}
+
+function renderTable() {
+  const tbody = document.getElementById('attendance-tbody');
+  tbody.innerHTML = students.map(s => {
+    const d = attendanceData[s.student_id] || {};
+    const status = d.status || '';
+    const checkedAt = d.checked_at ? new Date(d.checked_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) : '—';
+    return '<tr id="row-' + s.student_id + '" class="' + (status ? 'row-' + status : '') + '">' +
+      '<td style="text-align:center;font-weight:700">' + s.number + '</td>' +
+      '<td><div class="student-info">' + avatarHtml(s) +
+        '<div><div class="name">' + s.name + '</div><div class="meta">รหัส: ' + s.student_id + ' | ชั้น: ' + s.class + '</div></div>' +
+      '</div></td>' +
+      '<td><div class="status-group">' +
+        '<button class="status-btn present ' + (status==='present'?'active':'') + '" onclick="setStatus(\'' + s.student_id + '\',\'present\')">✅ มา</button>' +
+        '<button class="status-btn absent '  + (status==='absent' ?'active':'') + '" onclick="setStatus(\'' + s.student_id + '\',\'absent\')">❌ ขาด</button>' +
+        '<button class="status-btn leave '   + (status==='leave'  ?'active':'') + '" onclick="setStatus(\'' + s.student_id + '\',\'leave\')">🟡 ลา</button>' +
+      '</div></td>' +
+      '<td><input class="note-input" type="text" placeholder="บันทึกพฤติกรรม / หมายเหตุ" maxlength="200" value="' + (d.note||'') + '" onchange="setNote(\'' + s.student_id + '\', this.value)"></td>' +
+      '<td style="font-size:13px;color:var(--gray-500)" id="time-' + s.student_id + '">' + checkedAt + '</td>' +
+    '</tr>';
+  }).join('');
+}
+
+function setStatus(studentId, status) {
+  attendanceData[studentId] = attendanceData[studentId] || {};
+  attendanceData[studentId].status = status;
+  attendanceData[studentId].checked_at = new Date().toISOString();
+  const row = document.getElementById('row-' + studentId);
+  row.className = 'row-' + status;
+  row.querySelectorAll('.status-btn').forEach(b => b.classList.toggle('active', b.classList.contains(status)));
+  const now = new Date();
+  document.getElementById('time-' + studentId).textContent = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+  updateSummary();
+}
+
+function setNote(studentId, note) {
+  attendanceData[studentId] = attendanceData[studentId] || {};
+  attendanceData[studentId].note = note;
+}
+
+function markAll(status) { students.forEach(s => setStatus(s.student_id, status)); }
+
+function updateSummary() {
+  let present = 0, absent = 0, leave = 0;
+  Object.values(attendanceData).forEach(d => {
+    if (d.status === 'present') present++;
+    else if (d.status === 'absent') absent++;
+    else if (d.status === 'leave') leave++;
+  });
+  const total = students.length;
+  const pct = total > 0 ? ((present / total) * 100).toFixed(1) : 0;
+  document.getElementById('cnt-present').textContent = present;
+  document.getElementById('cnt-absent').textContent = absent;
+  document.getElementById('cnt-leave').textContent = leave;
+  document.getElementById('cnt-percent').textContent = pct;
+  document.getElementById('save-info').textContent = 'เช็กแล้ว ' + (present+absent+leave) + '/' + total + ' คน';
+}
+
+async function saveAttendance() {
+  const date = document.getElementById('date-picker').value;
+  const classId = getCurrentClassId();
+  if (!date) { showToast('กรุณาเลือกวันที่', 'warning'); return; }
+  if (!classId) { showToast('กรุณาเลือกชั้นเรียน', 'warning'); return; }
+  if (students.length === 0) { showToast('ไม่มีนักเรียนในชั้นนี้', 'warning'); return; }
+
+  const records = students.map(s => ({
+    student_id: s.student_id,
+    status: attendanceData[s.student_id]?.status || 'absent',
+    note: attendanceData[s.student_id]?.note || ''
+  }));
+
+  const unchecked = records.filter(r => !attendanceData[r.student_id]?.status).length;
+  if (unchecked > 0) {
+    if (!confirm('ยังมีนักเรียน ' + unchecked + ' คนที่ยังไม่ได้เช็กสถานะ\nระบบจะบันทึกเป็น "ขาดเรียน" อัตโนมัติ\nต้องการบันทึกหรือไม่?')) return;
+  }
+
+  try {
+    const body = { date, records };
+    if (attendanceType === 'subject' && selectedSubjectId) {
+      body.subject_id = selectedSubjectId;
+    }
+    const result = await apiFetch('/attendance/save', { method: 'POST', body: JSON.stringify(body) });
+    showToast('✅ บันทึกข้อมูลเรียบร้อย', 'success');
+    showSavePopup(result.stats, date);
+  } catch (e) {
+    showToast('บันทึกไม่สำเร็จ: ' + e.message, 'error');
+  }
+}
+
+function showSavePopup(stats, date) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay show';
+  overlay.innerHTML =
+    '<div class="modal" style="max-width:380px;text-align:center">' +
+    '<div class="modal-body" style="padding:32px 24px">' +
+    '<div style="font-size:48px;margin-bottom:10px">✅</div>' +
+    '<h2 style="font-size:18px;font-weight:800;margin-bottom:4px">บันทึกข้อมูลเรียบร้อย</h2>' +
+    '<p style="color:var(--gray-500);font-size:13px;margin-bottom:4px">' + formatThaiDate(date) + '</p>' +
+    '<p style="color:var(--primary);font-size:13px;font-weight:700;margin-bottom:16px">🏠 ประจำชั้น</p>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px">' +
+    '<div style="background:var(--success-light);border-radius:10px;padding:12px"><div style="font-size:22px;font-weight:800;color:var(--success)">' + stats.present + '</div><div style="font-size:11px;color:var(--success)">มาเรียน</div></div>' +
+    '<div style="background:var(--danger-light);border-radius:10px;padding:12px"><div style="font-size:22px;font-weight:800;color:var(--danger)">' + stats.absent + '</div><div style="font-size:11px;color:var(--danger)">ขาดเรียน</div></div>' +
+    '<div style="background:var(--warning-light);border-radius:10px;padding:12px"><div style="font-size:22px;font-weight:800;color:var(--warning)">' + stats.leave + '</div><div style="font-size:11px;color:var(--warning)">ลา</div></div>' +
+    '</div>' +
+    '<div style="background:var(--primary-light);border-radius:10px;padding:12px;margin-bottom:16px">' +
+    '<div style="font-size:28px;font-weight:800;color:var(--primary)">' + stats.percent + '%</div>' +
+    '<div style="font-size:12px;color:var(--primary)">เปอร์เซ็นต์การเข้าเรียน</div></div>' +
+    '<button class="btn btn-primary" style="width:100%" onclick="this.closest(\'.modal-overlay\').remove()">ตกลง</button>' +
+    '</div></div>';
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+}
+
+function openQrScanner() {
+  const today = getTodayISO();
+  const qrDate = document.getElementById('qr-scan-date');
+  qrDate.value = document.getElementById('date-picker').value || today;
+  qrDate.max = today;
+  
+  if (attendanceType === 'subject') {
+    qrSelectedSubjectId = selectedSubjectId;
+    document.getElementById('qr-subject-row').style.display = 'none';
+  } else {
+    document.getElementById('qr-subject-row').style.display = 'none';
+    qrSelectedSubjectId = null;
+  }
+  
+  document.getElementById('qr-scanner-modal').classList.add('show');
+}
+
+function buildQrSubjectPills() {
+  const pills = document.getElementById('qr-subject-pills');
+  qrSelectedSubjectId = selectedSubjectId;
+  let html = availableSubjects.map(s => {
+    const sid = s.subject_id || s.id;
+    const isActive = String(qrSelectedSubjectId) === String(sid);
+    return `<button class="subject-pill ${isActive ? 'active' : ''}" id="qrpill-${sid}" onclick="selectQrSubject(${sid},'${sid}')"
+      style="background:${s.color}22;color:${s.color};font-size:12px;padding:4px 12px">${s.icon} ${s.subject_name}</button>`;
+  }).join('');
+  pills.innerHTML = html;
+}
+
+function selectQrSubject(subjectId, pillKey) {
+  qrSelectedSubjectId = subjectId;
+  document.querySelectorAll('#qr-subject-pills .subject-pill').forEach(p => p.classList.remove('active'));
+  document.getElementById('qrpill-' + pillKey)?.classList.add('active');
+}
+
+function closeQrScanner() {
+  stopAttScanner();
+  document.getElementById('qr-scanner-modal').classList.remove('show');
+}
+
+async function startAttScanner() {
+  const date = document.getElementById('qr-scan-date').value;
+  if (!date) { showToast('กรุณาเลือกวันที่ก่อนสแกน', 'warning'); return; }
+  document.getElementById('qr-start-btn').style.display = 'none';
+  document.getElementById('qr-stop-btn').style.display = 'inline-flex';
+  attQrCode = new Html5Qrcode('att-qr-reader');
+  try {
+    await attQrCode.start(
+      { facingMode: 'environment' },
+      { fps: 10, qrbox: { width: 250, height: 250 } },
+      onAttScanSuccess,
+      () => {}
+    );
+  } catch (e) {
+    showToast('ไม่สามารถเปิดกล้องได้: ' + e.message, 'error');
+    document.getElementById('qr-start-btn').style.display = 'inline-flex';
+    document.getElementById('qr-stop-btn').style.display = 'none';
+  }
+}
+
+async function stopAttScanner() {
+  if (attQrCode) {
+    try { await attQrCode.stop(); } catch(e) {}
+    attQrCode = null;
+  }
+  document.getElementById('qr-start-btn').style.display = 'inline-flex';
+  document.getElementById('qr-stop-btn').style.display = 'none';
+  document.getElementById('att-qr-reader').innerHTML = '';
+}
+
+async function onAttScanSuccess(decodedText) {
+  if (attScanCooldown || decodedText === attLastScanned) return;
+  attLastScanned = decodedText;
+  attScanCooldown = true;
+  setTimeout(() => { attScanCooldown = false; attLastScanned = ''; }, 3000);
+
+  const date = document.getElementById('qr-scan-date').value;
+  let studentData;
+  try { studentData = JSON.parse(decodedText); }
+  catch { showAttScanResult(false, 'QR Code ไม่ถูกต้อง', ''); playAttBeep(false); return; }
+
+  try {
+    const body = { student_id: studentData.student_id, date };
+    if (attendanceType === 'subject' && qrSelectedSubjectId) {
+      body.subject_id = qrSelectedSubjectId;
+    }
+    const result = await apiFetch('/attendance/qr-checkin', { method: 'POST', body: JSON.stringify(body) });
+    showAttScanResult(true, result.student.name, `รหัส: ${result.student.student_id} | ชั้น: ${result.student.class}`);
+    addAttScanLog(result.student, true);
+    playAttBeep(true);
+    const sid = result.student.student_id;
+    if (attendanceData[sid] !== undefined) {
+      attendanceData[sid] = { status: 'present', note: 'เช็กชื่อผ่าน QR Code', checked_at: new Date().toISOString() };
+      const row = document.getElementById('row-' + sid);
+      if (row) {
+        row.className = 'row-present';
+        row.querySelectorAll('.status-btn').forEach(b => b.classList.toggle('active', b.classList.contains('present')));
+        const now = new Date();
+        const timeEl = document.getElementById('time-' + sid);
+        if (timeEl) timeEl.textContent = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+        const noteInput = row.querySelector('.note-input');
+        if (noteInput) noteInput.value = 'เช็กชื่อผ่าน QR Code';
+      }
+      updateSummary();
+    }
+  } catch (e) {
+    showAttScanResult(false, 'ไม่พบนักเรียนในระบบ', studentData.student_id || '');
+    playAttBeep(false);
+  }
+}
+
+function showAttScanResult(success, name, meta) {
+  const el = document.getElementById('qr-scan-result');
+  el.className = `qr-scan-result ${success ? 'success' : 'error'}`;
+  document.getElementById('qr-scan-icon').textContent = success ? '✅' : '❌';
+  document.getElementById('qr-scan-name').textContent = name;
+  document.getElementById('qr-scan-meta').textContent = meta;
+  setTimeout(() => { el.className = 'qr-scan-result'; }, 4000);
+}
+
+function addAttScanLog(student, success) {
+  const now = new Date();
+  const time = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`;
+  attScanLog.unshift({ student, success, time });
+  document.getElementById('qr-log-count').textContent = attScanLog.length;
+  document.getElementById('qr-scan-log').innerHTML = attScanLog.map(l =>
+    `<div class="qr-scan-log-item">
+      <span>${l.success ? '✅' : '❌'}</span>
+      <span style="flex:1;font-weight:600">${l.student.name}</span>
+      <span style="font-size:12px;color:var(--gray-500)">${l.student.student_id}</span>
+      <span class="qr-scan-log-time">${l.time}</span>
+    </div>`
+  ).join('');
+}
+
+function clearAttScanLog() {
+  attScanLog = [];
+  document.getElementById('qr-log-count').textContent = '0';
+  document.getElementById('qr-scan-log').innerHTML = '<div style="text-align:center;padding:20px;color:var(--gray-400);font-size:13px">ยังไม่มีการสแกน</div>';
+}
+
+function playAttBeep(success) {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.frequency.value = success ? 880 : 220;
+    osc.type = 'sine';
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.3);
+  } catch(e) {}
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+  const todayISO = getTodayISO();
+  const datePicker = document.getElementById('date-picker');
+  datePicker.value = todayISO;
+  datePicker.max = todayISO;
+  datePicker.addEventListener('change', loadAttendance);
+  showState('class');
+  await new Promise(r => setTimeout(r, 200));
+  await initPage();
+});
+
+document.getElementById('qr-scanner-modal')?.addEventListener('click', e => {
+  if (e.target === document.getElementById('qr-scanner-modal')) closeQrScanner();
+});
+</script>
+</body>
+</html>

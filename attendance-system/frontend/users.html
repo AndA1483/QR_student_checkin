@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>จัดการผู้ใช้ – ระบบเช็กชื่อนักเรียน</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">🏫</div>
+      <div class="logo-text"><h2>ระบบเช็กชื่อ</h2><span>นักเรียน</span></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-title">เมนูหลัก</div>
+      <a href="index.html"      class="nav-item"><span class="nav-icon">📊</span> Dashboard</a>
+      <a href="attendance.html" class="nav-item"><span class="nav-icon">✅</span> เช็กชื่อ</a>
+      <a href="report.html"     class="nav-item"><span class="nav-icon">📋</span> รายงาน</a>
+      <div class="nav-section-title">จัดการ</div>
+      <a href="classes.html"    class="nav-item admin-only" style="display:none"><span class="nav-icon">🏛️</span> จัดการชั้นเรียน</a>
+      <a href="students.html"   class="nav-item"><span class="nav-icon">👨‍🎓</span> จัดการนักเรียน</a>
+      <a href="qrcode.html"     class="nav-item"><span class="nav-icon">📷</span> QR Code</a>
+      <a href="users.html"      class="nav-item active admin-only" style="display:none"><span class="nav-icon">👥</span> จัดการผู้ใช้</a>
+      <div class="nav-section-title">บัญชีของฉัน</div>
+      <a href="profile.html"    class="nav-item"><span class="nav-icon">⚙️</span> ตั้งค่าการสอน</a>
+    </nav>
+    <div class="user-panel">
+      <div class="user-avatar-circle" id="user-avatar">?</div>
+      <div class="user-info"><div class="u-name" id="user-name">กำลังโหลด...</div><div class="u-role" id="user-role"></div></div>
+      <button class="logout-btn" onclick="logout()" title="ออกจากระบบ">🚪</button>
+    </div>
+  </aside>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <div class="main-content">
+    <header class="top-header">
+      <div class="header-left">
+        <button class="menu-toggle" id="menu-toggle">☰</button>
+        <div class="page-title"><h1>👥 จัดการผู้ใช้</h1><p>เพิ่ม แก้ไข ลบบัญชีครู</p></div>
+      </div>
+      <div class="header-right">
+        <span class="header-date" id="header-date"></span>
+        <button class="btn btn-primary" onclick="openAddModal()">➕ เพิ่มผู้ใช้</button>
+      </div>
+    </header>
+
+    <main class="page-content">
+      <div id="loading-state" class="loading"><div class="spinner"></div> กำลังโหลด...</div>
+      <div class="card" id="users-card" style="display:none">
+        <div class="card-body" style="padding:0">
+          <div class="table-wrapper">
+            <table>
+              <thead><tr>
+                <th>ชื่อ-สกุล</th><th>Username</th><th>บทบาท</th>
+                <th>วิชาที่สอน</th><th>ประจำชั้น</th><th></th>
+              </tr></thead>
+              <tbody id="users-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- Add/Edit Modal -->
+<div class="modal-overlay" id="user-modal">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-title">➕ เพิ่มผู้ใช้</span>
+      <button class="modal-close" onclick="closeModal('user-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="user-form" onsubmit="saveUser(event)">
+        <input type="hidden" id="edit-id">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Username *</label>
+            <input type="text" id="f-username" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">บทบาท</label>
+            <select id="f-role" class="form-control">
+              <option value="teacher">👩‍🏫 ครู</option>
+              <option value="admin">👑 Admin</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">ชื่อ-สกุล *</label>
+          <input type="text" id="f-fullname" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label" id="pw-label">รหัสผ่าน *</label>
+          <input type="password" id="f-password" class="form-control" placeholder="ปล่อยว่างเพื่อไม่เปลี่ยน">
+        </div>
+        <div class="modal-footer" style="padding:0;margin-top:8px">
+          <button type="button" class="btn btn-outline" onclick="closeModal('user-modal')">ยกเลิก</button>
+          <button type="submit" class="btn btn-primary">💾 บันทึก</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Assignment Detail Modal -->
+<div class="modal-overlay" id="assign-modal">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <span class="modal-title" id="assign-modal-title">📚 การมอบหมายการสอน</span>
+      <button class="modal-close" onclick="closeModal('assign-modal')">✕</button>
+    </div>
+    <div class="modal-body" style="max-height:480px;overflow-y:auto" id="assign-modal-body">
+      <div class="loading"><div class="spinner"></div></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('assign-modal')">ปิด</button>
+      <a id="assign-edit-btn" href="#" class="btn btn-primary">⚙️ แก้ไขการตั้งค่า</a>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Modal -->
+<div class="modal-overlay" id="delete-modal">
+  <div class="modal" style="max-width:360px">
+    <div class="modal-header"><span class="modal-title">🗑️ ยืนยันการลบ</span><button class="modal-close" onclick="closeModal('delete-modal')">✕</button></div>
+    <div class="modal-body"><p>ลบผู้ใช้ <b id="delete-name"></b>?</p></div>
+    <div class="modal-footer"><button class="btn btn-outline" onclick="closeModal('delete-modal')">ยกเลิก</button><button class="btn btn-danger" onclick="confirmDelete()">🗑️ ลบ</button></div>
+  </div>
+</div>
+
+<script src="assets/js/app.js"></script>
+<script>
+let allUsers = [];
+let deleteTargetId = null;
+
+async function loadUsers() {
+  try {
+    allUsers = await apiFetch('/users');
+    renderUsers();
+    document.getElementById('loading-state').style.display = 'none';
+    document.getElementById('users-card').style.display = 'block';
+  } catch(e) { showToast('โหลดข้อมูลไม่สำเร็จ', 'error'); }
+}
+
+function renderUsers() {
+  document.getElementById('users-tbody').innerHTML = allUsers.map(u => `
+    <tr>
+      <td>
+        <div style="display:flex;align-items:center;gap:10px">
+          <div class="user-avatar-circle" style="width:36px;height:36px;font-size:14px;background:${u.role==='admin'?'#f59e0b':'#4f46e5'}">${u.full_name[0]}</div>
+          <b>${u.full_name}</b>
+        </div>
+      </td>
+      <td style="color:var(--gray-500);font-size:13px">${u.username}</td>
+      <td>${u.role === 'admin'
+        ? '<span class="badge" style="background:#fef3c7;color:#92400e">👑 Admin</span>'
+        : '<span class="badge" style="background:#e0e7ff;color:#3730a3">👩‍🏫 ครู</span>'}</td>
+      <td>
+        <span class="badge" style="background:var(--gray-100);color:var(--gray-600);cursor:pointer"
+          onclick="showAssignmentDetail(${u.id})" title="คลิกดูรายละเอียด">
+          ${u.subject_count} วิชา
+        </span>
+      </td>
+      <td>
+        <span class="badge" style="background:var(--gray-100);color:var(--gray-600)">
+          ${u.homeroom_count} ห้อง
+        </span>
+      </td>
+      <td style="text-align:right">
+        <div style="display:flex;gap:6px;justify-content:flex-end">
+          <a href="profile.html?user_id=${u.id}" class="btn btn-primary btn-sm">⚙️ ตั้งค่าการสอน</a>
+          <button class="btn btn-outline btn-sm" onclick="openEditModal(${u.id})">✏️</button>
+          <button class="btn btn-outline btn-sm" onclick="openDeleteModal(${u.id},'${u.full_name.replace(/'/g,"\\'")}')">🗑️</button>
+        </div>
+      </td>
+    </tr>`).join('');
+}
+
+function openAddModal() {
+  document.getElementById('modal-title').textContent = '➕ เพิ่มผู้ใช้';
+  document.getElementById('edit-id').value = '';
+  document.getElementById('user-form').reset();
+  document.getElementById('f-username').disabled = false;
+  document.getElementById('pw-label').textContent = 'รหัสผ่าน *';
+  openModal('user-modal');
+}
+
+function openEditModal(id) {
+  const u = allUsers.find(x => x.id === id);
+  if (!u) return;
+  document.getElementById('modal-title').textContent = '✏️ แก้ไขผู้ใช้';
+  document.getElementById('edit-id').value = u.id;
+  document.getElementById('f-username').value = u.username;
+  document.getElementById('f-username').disabled = true;
+  document.getElementById('f-fullname').value = u.full_name;
+  document.getElementById('f-role').value = u.role;
+  document.getElementById('f-password').value = '';
+  document.getElementById('pw-label').textContent = 'รหัสผ่านใหม่ (ปล่อยว่างเพื่อไม่เปลี่ยน)';
+  openModal('user-modal');
+}
+
+async function saveUser(e) {
+  e.preventDefault();
+  const editId = document.getElementById('edit-id').value;
+  const body = {
+    username:  document.getElementById('f-username').value,
+    full_name: document.getElementById('f-fullname').value,
+    role:      document.getElementById('f-role').value,
+    password:  document.getElementById('f-password').value || undefined,
+  };
+  try {
+    if (editId) {
+      await apiFetch(`/users/${editId}`, { method: 'PUT', body: JSON.stringify(body) });
+      showToast('อัปเดตเรียบร้อย', 'success');
+    } else {
+      if (!body.password) { showToast('กรุณากรอกรหัสผ่าน', 'warning'); return; }
+      await apiFetch('/users', { method: 'POST', body: JSON.stringify(body) });
+      showToast('เพิ่มผู้ใช้เรียบร้อย', 'success');
+    }
+    closeModal('user-modal');
+    loadUsers();
+  } catch(err) { showToast(err.message, 'error'); }
+}
+
+function openDeleteModal(id, name) { deleteTargetId = id; document.getElementById('delete-name').textContent = name; openModal('delete-modal'); }
+async function confirmDelete() {
+  try {
+    await apiFetch(`/users/${deleteTargetId}`, { method: 'DELETE' });
+    showToast('ลบเรียบร้อย', 'success');
+    closeModal('delete-modal');
+    loadUsers();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function showAssignmentDetail(userId) {
+  const u = allUsers.find(x => x.id === userId);
+  if (!u) return;
+  document.getElementById('assign-modal-title').textContent = `📚 การสอนของ ${u.full_name}`;
+  document.getElementById('assign-edit-btn').href = `profile.html?user_id=${userId}`;
+  document.getElementById('assign-modal-body').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  openModal('assign-modal');
+
+  try {
+    const data = await apiFetch(`/users/${userId}/assignments`);
+
+    // Group subjects by subject_id
+    const subjectMap = {};
+    data.subjects.forEach(s => {
+      if (!subjectMap[s.subject_id]) subjectMap[s.subject_id] = { ...s, classes: [] };
+      subjectMap[s.subject_id].classes.push(s.class_code);
+    });
+
+    const homeroomHtml = data.homerooms.length > 0
+      ? `<div style="margin-bottom:20px">
+          <div style="font-size:13px;font-weight:700;color:var(--gray-600);margin-bottom:10px">🏠 ห้องประจำชั้น</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            ${data.homerooms.map(h =>
+              `<span style="background:#dbeafe;color:#1d4ed8;padding:5px 14px;border-radius:20px;font-size:13px;font-weight:700">🏠 ${h.class_code}</span>`
+            ).join('')}
+          </div>
+        </div>`
+      : `<div style="margin-bottom:20px;padding:16px;background:var(--gray-50);border-radius:8px;color:var(--gray-400);font-size:13px;text-align:center">ยังไม่มีห้องประจำชั้น</div>`;
+
+    const subjectsHtml = Object.values(subjectMap).length > 0
+      ? Object.values(subjectMap).map(s => `
+          <div style="margin-bottom:14px">
+            <div style="display:inline-flex;align-items:center;gap:6px;padding:4px 14px;border-radius:20px;font-size:13px;font-weight:700;background:${s.color}22;color:${s.color};margin-bottom:8px">
+              ${s.icon} ${s.subject_name}
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              ${s.classes.map(c =>
+                `<span style="background:var(--gray-100);color:var(--gray-700);padding:4px 12px;border-radius:6px;font-size:13px;font-weight:600">${c}</span>`
+              ).join('')}
+            </div>
+          </div>`).join('')
+      : `<div style="padding:16px;background:var(--gray-50);border-radius:8px;color:var(--gray-400);font-size:13px;text-align:center">ยังไม่มีวิชาที่มอบหมาย</div>`;
+
+    document.getElementById('assign-modal-body').innerHTML =
+      homeroomHtml +
+      `<div style="font-size:13px;font-weight:700;color:var(--gray-600);margin-bottom:10px">📚 วิชาที่สอน</div>` +
+      subjectsHtml;
+  } catch(e) {
+    document.getElementById('assign-modal-body').innerHTML = `<div style="color:var(--danger);padding:16px">โหลดข้อมูลไม่สำเร็จ</div>`;
+  }
+}
+
+loadUsers();
+</script>
+</body>
+</html>

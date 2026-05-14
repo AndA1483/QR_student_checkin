@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>จัดการชั้นเรียน – ระบบเช็กชื่อนักเรียน</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<div class="app-layout">
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">🏫</div>
+      <div class="logo-text"><h2>ระบบเช็กชื่อ</h2><span>นักเรียน</span></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-title">เมนูหลัก</div>
+      <a href="index.html"      class="nav-item"><span class="nav-icon">📊</span> Dashboard</a>
+      <a href="attendance.html" class="nav-item"><span class="nav-icon">✅</span> เช็กชื่อ</a>
+      <a href="report.html"     class="nav-item"><span class="nav-icon">📋</span> รายงาน</a>
+      <div class="nav-section-title">จัดการ</div>
+      <a href="classes.html"    class="nav-item active"><span class="nav-icon">🏛️</span> จัดการชั้นเรียน</a>
+      <a href="students.html"   class="nav-item admin-only" style="display:none"><span class="nav-icon">👨‍🎓</span> จัดการนักเรียน</a>
+      <a href="qrcode.html"     class="nav-item"><span class="nav-icon">📷</span> QR Code</a>
+      <a href="users.html"      class="nav-item admin-only" style="display:none"><span class="nav-icon">👥</span> จัดการผู้ใช้</a>
+      <div class="nav-section-title">บัญชีของฉัน</div>
+      <a href="profile.html"    class="nav-item"><span class="nav-icon">⚙️</span> ตั้งค่าการสอน</a>
+    </nav>
+    <div class="user-panel">
+      <div class="user-avatar-circle" id="user-avatar">?</div>
+      <div class="user-info"><div class="u-name" id="user-name">กำลังโหลด...</div><div class="u-role" id="user-role"></div></div>
+      <button class="logout-btn" onclick="logout()" title="ออกจากระบบ">🚪</button>
+    </div>
+  </aside>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <div class="main-content">
+    <header class="top-header">
+      <div class="header-left">
+        <button class="menu-toggle" id="menu-toggle">☰</button>
+        <div class="page-title">
+          <h1>🏛️ จัดการชั้นเรียน</h1>
+          <p>เพิ่ม แก้ไข ลบชั้นเรียนและห้องเรียน</p>
+        </div>
+      </div>
+      <div class="header-right">
+        <span class="header-date" id="header-date"></span>
+        <button class="btn btn-primary" onclick="openAddModal()">➕ เพิ่มชั้นเรียน</button>
+      </div>
+    </header>
+
+    <main class="page-content">
+      <!-- Stats -->
+      <div class="stats-grid" id="class-stats" style="margin-bottom:20px"></div>
+
+      <!-- Grade Filter Tabs -->
+      <div id="grade-tabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:20px"></div>
+
+      <!-- Loading -->
+      <div id="loading-state" class="loading"><div class="spinner"></div> กำลังโหลด...</div>
+
+      <!-- Classes Container (grouped by grade) -->
+      <div id="classes-container"></div>
+
+      <!-- Empty -->
+      <div id="empty-state" class="empty-state" style="display:none">
+        <div class="empty-icon">🏛️</div>
+        <p>ยังไม่มีชั้นเรียน</p>
+        <button class="btn btn-primary" style="margin-top:12px" onclick="openAddModal()">➕ เพิ่มชั้นเรียนแรก</button>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- Add/Edit Modal -->
+<div class="modal-overlay" id="class-modal">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-title">➕ เพิ่มชั้นเรียน</span>
+      <button class="modal-close" onclick="closeModal('class-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="class-form" onsubmit="saveClass(event)">
+        <input type="hidden" id="edit-id">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">รหัสชั้นเรียน * <span style="font-size:11px;color:var(--gray-400)">(เช่น ป.4/1)</span></label>
+            <input type="text" id="f-code" class="form-control" placeholder="ป.4/1" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">ปีการศึกษา</label>
+            <input type="text" id="f-year" class="form-control" placeholder="2567">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">ชื่อชั้นเรียน *</label>
+          <input type="text" id="f-name" class="form-control" placeholder="ประถมศึกษาปีที่ 4/1" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">ระดับชั้น</label>
+            <select id="f-grade" class="form-control" onchange="autoFillCode()">
+              <option value="">— เลือกระดับชั้น —</option>
+              <optgroup label="ประถมศึกษา">
+                <option value="ป.1">ป.1</option>
+                <option value="ป.2">ป.2</option>
+                <option value="ป.3">ป.3</option>
+                <option value="ป.4">ป.4</option>
+                <option value="ป.5">ป.5</option>
+                <option value="ป.6">ป.6</option>
+              </optgroup>
+              <optgroup label="มัธยมศึกษาตอนต้น">
+                <option value="ม.1">ม.1</option>
+                <option value="ม.2">ม.2</option>
+                <option value="ม.3">ม.3</option>
+              </optgroup>
+              <optgroup label="มัธยมศึกษาตอนปลาย">
+                <option value="ม.4">ม.4</option>
+                <option value="ม.5">ม.5</option>
+                <option value="ม.6">ม.6</option>
+              </optgroup>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">ห้อง</label>
+            <input type="text" id="f-room" class="form-control" placeholder="1" oninput="autoFillCode()">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">ครูประจำชั้น</label>
+          <input type="text" id="f-teacher" class="form-control" placeholder="ครูสมชาย ใจดี">
+        </div>
+        <div class="modal-footer" style="padding:0;margin-top:8px">
+          <button type="button" class="btn btn-outline" onclick="closeModal('class-modal')">ยกเลิก</button>
+          <button type="submit" class="btn btn-primary">💾 บันทึก</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Confirm Modal -->
+<div class="modal-overlay" id="delete-modal">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-header">
+      <span class="modal-title">🗑️ ยืนยันการลบ</span>
+      <button class="modal-close" onclick="closeModal('delete-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p>คุณต้องการลบชั้นเรียน <b id="delete-name"></b> ออกจากระบบ?</p>
+      <p style="font-size:13px;color:var(--danger);margin-top:8px">⚠️ ต้องย้ายนักเรียนออกก่อนจึงจะลบได้</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('delete-modal')">ยกเลิก</button>
+      <button class="btn btn-danger" onclick="confirmDelete()">🗑️ ลบ</button>
+    </div>
+  </div>
+</div>
+
+<!-- Students in Class Modal -->
+<div class="modal-overlay" id="students-modal">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <span class="modal-title" id="students-modal-title">นักเรียนในชั้น</span>
+      <button class="modal-close" onclick="closeModal('students-modal')">✕</button>
+    </div>
+    <div class="modal-body" style="padding:0;max-height:400px;overflow-y:auto">
+      <div id="students-modal-body"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('students-modal')">ปิด</button>
+      <a id="goto-students-btn" href="students.html" class="btn btn-primary">จัดการนักเรียน →</a>
+    </div>
+  </div>
+</div>
+
+<script src="assets/js/app.js"></script>
+<script>
+let allClasses = [];
+let deleteTargetId = null;
+let activeGrade = 'all';
+
+// Grade color palette
+const gradeColors = {
+  'ม.1': { bg: '#dbeafe', text: '#1d4ed8', border: '#3b82f6' },
+  'ม.2': { bg: '#d1fae5', text: '#065f46', border: '#10b981' },
+  'ม.3': { bg: '#ede9fe', text: '#5b21b6', border: '#8b5cf6' },
+  'ป.1': { bg: '#fef3c7', text: '#92400e', border: '#f59e0b' },
+  'ป.2': { bg: '#fef3c7', text: '#92400e', border: '#f59e0b' },
+  'ป.3': { bg: '#fef3c7', text: '#92400e', border: '#f59e0b' },
+  'ป.4': { bg: '#fee2e2', text: '#991b1b', border: '#ef4444' },
+  'ป.5': { bg: '#fee2e2', text: '#991b1b', border: '#ef4444' },
+  'ป.6': { bg: '#fee2e2', text: '#991b1b', border: '#ef4444' },
+};
+function gradeColor(grade) {
+  return gradeColors[grade] || { bg: '#f3f4f6', text: '#374151', border: '#9ca3af' };
+}
+
+async function loadPageClasses() {
+  try {
+    allClasses = await apiFetch('/classes');
+    renderStats();
+    renderGradeTabs();
+    renderClasses();
+  } catch (e) {
+    showToast('โหลดข้อมูลไม่สำเร็จ', 'error');
+  }
+}
+
+function renderStats() {
+  const total = allClasses.length;
+  const totalStudents = allClasses.reduce((a, c) => a + (c.student_count || 0), 0);
+  const grades = [...new Set(allClasses.map(c => c.grade).filter(Boolean))];
+
+  // Per-grade stats
+  const gradeStats = grades.map(g => {
+    const cls = allClasses.filter(c => c.grade === g);
+    const students = cls.reduce((a, c) => a + (c.student_count || 0), 0);
+    const col = gradeColor(g);
+    return `<div class="stat-card">
+      <div class="stat-icon" style="background:${col.bg}"><span style="font-size:20px">🏛️</span></div>
+      <div class="stat-info">
+        <div class="stat-value" style="color:${col.text}">${students}</div>
+        <div class="stat-label">${g} (${cls.length} ห้อง)</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('class-stats').innerHTML = `
+    <div class="stat-card"><div class="stat-icon blue">🏛️</div><div class="stat-info"><div class="stat-value">${total}</div><div class="stat-label">ห้องเรียนทั้งหมด</div></div></div>
+    <div class="stat-card"><div class="stat-icon green">👨‍🎓</div><div class="stat-info"><div class="stat-value">${totalStudents}</div><div class="stat-label">นักเรียนทั้งหมด</div></div></div>
+    <div class="stat-card"><div class="stat-icon purple">📚</div><div class="stat-info"><div class="stat-value">${grades.length}</div><div class="stat-label">ระดับชั้น</div></div></div>
+    ${gradeStats}
+  `;
+}
+
+function renderGradeTabs() {
+  const grades = ['all', ...new Set(allClasses.map(c => c.grade).filter(Boolean))];
+  document.getElementById('grade-tabs').innerHTML = grades.map(g => {
+    const col = g === 'all' ? { bg: '#e0e7ff', text: '#3730a3', border: '#6366f1' } : gradeColor(g);
+    const label = g === 'all' ? '📚 ทุกระดับชั้น' : `🏛️ ${g}`;
+    const count = g === 'all' ? allClasses.length : allClasses.filter(c => c.grade === g).length;
+    const isActive = activeGrade === g;
+    return `<button onclick="setGrade('${g}')" style="
+      padding:8px 18px; border-radius:20px; border:2px solid ${isActive ? col.border : '#e5e7eb'};
+      background:${isActive ? col.bg : 'white'}; color:${isActive ? col.text : '#6b7280'};
+      font-size:14px; font-weight:700; cursor:pointer; font-family:inherit;
+      transition:all .2s; display:flex; align-items:center; gap:6px;
+    ">${label} <span style="background:${isActive ? col.border : '#e5e7eb'};color:${isActive ? 'white' : '#6b7280'};border-radius:10px;padding:1px 8px;font-size:12px">${count}</span></button>`;
+  }).join('');
+}
+
+function setGrade(grade) {
+  activeGrade = grade;
+  renderGradeTabs();
+  renderClasses();
+}
+
+function renderClasses() {
+  document.getElementById('loading-state').style.display = 'none';
+  const container = document.getElementById('classes-container');
+
+  const filtered = activeGrade === 'all'
+    ? allClasses
+    : allClasses.filter(c => c.grade === activeGrade);
+
+  if (filtered.length === 0) {
+    container.innerHTML = '';
+    document.getElementById('empty-state').style.display = 'block';
+    return;
+  }
+  document.getElementById('empty-state').style.display = 'none';
+
+  // Group by grade
+  const groups = {};
+  filtered.forEach(c => {
+    if (!groups[c.grade]) groups[c.grade] = [];
+    groups[c.grade].push(c);
+  });
+
+  container.innerHTML = Object.entries(groups).map(([grade, classes]) => {
+    const col = gradeColor(grade);
+    const totalStudents = classes.reduce((a, c) => a + (c.student_count || 0), 0);
+    return `
+      <div style="margin-bottom:28px">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">
+          <div style="background:${col.bg};color:${col.text};border:2px solid ${col.border};
+            border-radius:10px;padding:6px 16px;font-size:16px;font-weight:800">${grade}</div>
+          <div>
+            <div style="font-size:15px;font-weight:700;color:var(--gray-800)">${gradeFullName(grade)}</div>
+            <div style="font-size:13px;color:var(--gray-500)">${classes.length} ห้อง · ${totalStudents} คน</div>
+          </div>
+          <div style="margin-left:auto;display:flex;gap:8px">
+            <a href="attendance.html?grade=${encodeURIComponent(grade)}" class="btn btn-outline btn-sm">✅ เช็กชื่อทั้งระดับ</a>
+            <a href="report.html?grade=${encodeURIComponent(grade)}" class="btn btn-outline btn-sm">📋 รายงาน</a>
+          </div>
+        </div>
+        <div class="classes-grid">
+          ${classes.map(c => classCardHtml(c, col)).join('')}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function gradeFullName(grade) {
+  const map = {
+    'ม.1':'มัธยมศึกษาปีที่ 1','ม.2':'มัธยมศึกษาปีที่ 2','ม.3':'มัธยมศึกษาปีที่ 3',
+    'ม.4':'มัธยมศึกษาปีที่ 4','ม.5':'มัธยมศึกษาปีที่ 5','ม.6':'มัธยมศึกษาปีที่ 6',
+    'ป.1':'ประถมศึกษาปีที่ 1','ป.2':'ประถมศึกษาปีที่ 2','ป.3':'ประถมศึกษาปีที่ 3',
+    'ป.4':'ประถมศึกษาปีที่ 4','ป.5':'ประถมศึกษาปีที่ 5','ป.6':'ประถมศึกษาปีที่ 6',
+  };
+  return map[grade] || grade;
+}
+
+function classCardHtml(c, col) {
+  return `<div class="class-card" style="border-top-color:${col.border}">
+    <div class="class-card-header">
+      <div>
+        <div class="class-code" style="color:${col.text}">${c.class_code}</div>
+        <div class="class-name">${c.class_name}</div>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-outline btn-sm btn-icon" title="แก้ไข" onclick="openEditModal(${c.id})">✏️</button>
+        <button class="btn btn-outline btn-sm btn-icon" title="ลบ" onclick="openDeleteModal(${c.id},'${c.class_code}')">🗑️</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+      <span class="class-student-count" style="background:${col.bg};color:${col.text}">👨‍🎓 ${c.student_count || 0} คน</span>
+      ${c.academic_year ? `<span class="badge" style="background:var(--gray-100);color:var(--gray-600)">📅 ${c.academic_year}</span>` : ''}
+    </div>
+    <div class="class-meta">
+      ${c.room    ? `<div class="class-meta-row"><span class="meta-icon">🚪</span> ห้อง: <b>${c.room}</b></div>` : ''}
+      ${c.teacher ? `<div class="class-meta-row"><span class="meta-icon">👩‍🏫</span> ครูประจำชั้น: <b>${c.teacher}</b></div>` : ''}
+    </div>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button class="btn btn-outline btn-sm" style="flex:1" onclick="showStudents(${c.id},'${c.class_code}')">👨‍🎓 นักเรียน</button>
+      <a href="attendance.html?class_id=${c.id}" class="btn btn-primary btn-sm" style="flex:1;text-align:center;background:${col.border}">✅ เช็กชื่อ</a>
+    </div>
+  </div>`;
+}
+
+function openAddModal() {
+  document.getElementById('modal-title').textContent = '➕ เพิ่มชั้นเรียน';
+  document.getElementById('edit-id').value = '';
+  document.getElementById('class-form').reset();
+  document.getElementById('f-year').value = '2567';
+  // Pre-select active grade
+  if (activeGrade !== 'all') document.getElementById('f-grade').value = activeGrade;
+  openModal('class-modal');
+}
+
+function openEditModal(id) {
+  const c = allClasses.find(x => x.id === id);
+  if (!c) return;
+  document.getElementById('modal-title').textContent = '✏️ แก้ไขชั้นเรียน';
+  document.getElementById('edit-id').value    = c.id;
+  document.getElementById('f-code').value     = c.class_code;
+  document.getElementById('f-name').value     = c.class_name;
+  document.getElementById('f-grade').value    = c.grade || '';
+  document.getElementById('f-room').value     = c.room || '';
+  document.getElementById('f-teacher').value  = c.teacher || '';
+  document.getElementById('f-year').value     = c.academic_year || '';
+  openModal('class-modal');
+}
+
+// Auto-fill class_code and class_name when grade+room change
+function autoFillCode() {
+  const grade = document.getElementById('f-grade').value;
+  const room  = document.getElementById('f-room').value.trim();
+  if (grade && room && !document.getElementById('edit-id').value) {
+    document.getElementById('f-code').value = `${grade}/${room}`;
+    document.getElementById('f-name').value = `${gradeFullName(grade)}/${room}`;
+  }
+}
+
+async function saveClass(e) {
+  e.preventDefault();
+  const editId = document.getElementById('edit-id').value;
+  const body = {
+    class_code:    document.getElementById('f-code').value.trim(),
+    class_name:    document.getElementById('f-name').value.trim(),
+    grade:         document.getElementById('f-grade').value,
+    room:          document.getElementById('f-room').value.trim(),
+    teacher:       document.getElementById('f-teacher').value.trim(),
+    academic_year: document.getElementById('f-year').value.trim(),
+  };
+  try {
+    if (editId) {
+      await apiFetch(`/classes/${editId}`, { method: 'PUT', body: JSON.stringify(body) });
+      showToast('อัปเดตชั้นเรียนเรียบร้อย', 'success');
+    } else {
+      await apiFetch('/classes', { method: 'POST', body: JSON.stringify(body) });
+      showToast('เพิ่มชั้นเรียนเรียบร้อย', 'success');
+    }
+    closeModal('class-modal');
+    _classCache = null;
+    loadPageClasses();
+  } catch (err) {
+    showToast('เกิดข้อผิดพลาด: ' + err.message, 'error');
+  }
+}
+
+function openDeleteModal(id, code) {
+  deleteTargetId = id;
+  document.getElementById('delete-name').textContent = code;
+  openModal('delete-modal');
+}
+
+async function confirmDelete() {
+  if (!deleteTargetId) return;
+  try {
+    await apiFetch(`/classes/${deleteTargetId}`, { method: 'DELETE' });
+    showToast('ลบชั้นเรียนเรียบร้อย', 'success');
+    closeModal('delete-modal');
+    _classCache = null;
+    loadPageClasses();
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+}
+
+async function showStudents(classId, classCode) {
+  document.getElementById('students-modal-title').textContent = `👨‍🎓 นักเรียนในชั้น ${classCode}`;
+  document.getElementById('goto-students-btn').href = `students.html?class_id=${classId}`;
+  document.getElementById('students-modal-body').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  openModal('students-modal');
+  try {
+    const students = await apiFetch(`/classes/${classId}/students`);
+    if (students.length === 0) {
+      document.getElementById('students-modal-body').innerHTML =
+        '<div class="empty-state" style="padding:32px"><div class="empty-icon">👨‍🎓</div><p>ยังไม่มีนักเรียนในชั้นนี้</p></div>';
+      return;
+    }
+    document.getElementById('students-modal-body').innerHTML = `
+      <table style="width:100%;font-size:14px;border-collapse:collapse">
+        <thead><tr style="background:var(--gray-50)">
+          <th style="padding:10px 16px;text-align:center;font-size:12px;color:var(--gray-500);border-bottom:1px solid var(--gray-200)">เลขที่</th>
+          <th style="padding:10px 16px;font-size:12px;color:var(--gray-500);border-bottom:1px solid var(--gray-200)">ชื่อ-สกุล</th>
+          <th style="padding:10px 16px;font-size:12px;color:var(--gray-500);border-bottom:1px solid var(--gray-200)">รหัส</th>
+        </tr></thead>
+        <tbody>
+          ${students.map(s => `
+            <tr style="border-bottom:1px solid var(--gray-100)">
+              <td style="padding:10px 16px;font-weight:700;text-align:center">${s.number}</td>
+              <td style="padding:10px 16px">
+                <div style="display:flex;align-items:center;gap:8px">
+                  ${avatarHtml(s)}<span style="font-weight:600">${s.name}</span>
+                </div>
+              </td>
+              <td style="padding:10px 16px;color:var(--gray-500)">${s.student_id}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>`;
+  } catch (e) {
+    showToast('โหลดข้อมูลไม่สำเร็จ', 'error');
+  }
+}
+
+loadPageClasses();
+</script>
+
+
+</script>
+</body>
+</html>

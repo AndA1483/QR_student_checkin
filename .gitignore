@@ -1,0 +1,28 @@
+# Node modules
+node_modules/
+attendance-system/node_modules/
+
+# Database
+attendance-system/data/*.db
+
+# Environment variables
+.env
+.env.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Build files
+dist/
+build/

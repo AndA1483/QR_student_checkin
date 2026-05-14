@@ -1,0 +1,855 @@
+
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>รายงาน – ระบบเช็กชื่อนักเรียน</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <!-- SheetJS สำหรับ export Excel -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <style>
+    .filter-row { display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px; }
+    .filter-row label { font-size:13px;font-weight:700;color:var(--gray-600);white-space:nowrap; }
+    .filter-select {
+      padding:8px 28px 8px 10px;border:1px solid var(--gray-300);border-radius:8px;
+      font-size:14px;font-family:inherit;outline:none;cursor:pointer;
+      background:white url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E") no-repeat right 8px center;
+      appearance:none; min-width:160px; transition:border-color .2s;
+    }
+    .filter-select:focus { border-color:var(--primary); }
+    .search-input { padding:8px 12px;border:1px solid var(--gray-300);border-radius:8px;font-size:14px;font-family:inherit;outline:none;min-width:160px; }
+    .search-input:focus { border-color:var(--primary); }
+    .tab-bar { display:flex;gap:4px;background:var(--gray-100);border-radius:10px;padding:4px;margin-bottom:20px; }
+    .tab-btn { flex:1;padding:10px 16px;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;background:transparent;color:var(--gray-500);transition:all .2s;font-family:inherit; }
+    .tab-btn.active { background:white;color:var(--primary);box-shadow:var(--shadow); }
+    .tab-content { display:none; }
+    .tab-content.active { display:block; }
+    .subject-tab-bar { display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px; }
+    .subject-tab-btn {
+      padding:7px 16px;border-radius:20px;border:2px solid transparent;
+      font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;
+      background:var(--gray-100);color:var(--gray-600);transition:all .15s;
+    }
+    .subject-tab-btn.active { border-color:currentColor; }
+    .date-history-item { display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--gray-100);cursor:pointer;transition:background .15s;gap:12px;flex-wrap:wrap; }
+    .date-history-item:hover { background:var(--gray-50); }
+    .date-history-item:last-child { border-bottom:none; }
+    .dhi-date { font-weight:700;font-size:15px; }
+    .dhi-stats { display:flex;gap:8px;flex-wrap:wrap; }
+    .semester-controls { display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px; }
+    .no-subject-prompt { text-align:center;padding:48px 24px;color:var(--gray-400); }
+    .no-subject-prompt .ns-icon { font-size:48px;margin-bottom:12px; }
+    @media print {
+      .sidebar,.top-header,.tab-bar,.filter-row,.semester-controls,.subject-tab-bar { display:none !important; }
+      .main-content { margin-left:0 !important; }
+      .page-content { padding:0 !important; }
+    }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">🏫</div>
+      <div class="logo-text"><h2>ระบบเช็กชื่อ</h2><span>นักเรียน</span></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-title">เมนูหลัก</div>
+      <a href="index.html"      class="nav-item"><span class="nav-icon">📊</span> Dashboard</a>
+      <a href="attendance.html" class="nav-item"><span class="nav-icon">✅</span> เช็กชื่อ</a>
+      <a href="report.html"     class="nav-item active"><span class="nav-icon">📋</span> รายงาน</a>
+      <div class="nav-section-title">จัดการ</div>
+      <a href="classes.html"    class="nav-item admin-only" style="display:none"><span class="nav-icon">🏛️</span> จัดการชั้นเรียน</a>
+      <a href="students.html"   class="nav-item"><span class="nav-icon">👨‍🎓</span> ข้อมูลนักเรียน</a>
+      <a href="qrcode.html"     class="nav-item"><span class="nav-icon">📷</span> QR Code</a>
+      <a href="users.html"      class="nav-item admin-only" style="display:none"><span class="nav-icon">👥</span> จัดการผู้ใช้</a>
+      <div class="nav-section-title">บัญชีของฉัน</div>
+      <a href="profile.html"    class="nav-item"><span class="nav-icon">⚙️</span> ตั้งค่าการสอน</a>
+    </nav>
+    <div class="user-panel">
+      <div class="user-avatar-circle" id="user-avatar">?</div>
+      <div class="user-info"><div class="u-name" id="user-name">กำลังโหลด...</div><div class="u-role" id="user-role"></div></div>
+      <button class="logout-btn" onclick="logout()" title="ออกจากระบบ">🚪</button>
+    </div>
+  </aside>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <div class="main-content">
+    <header class="top-header">
+      <div class="header-left">
+        <button class="menu-toggle" id="menu-toggle">☰</button>
+        <div class="page-title">
+          <h1>📋 รายงาน</h1>
+          <p id="report-subtitle">รายงานการเข้าเรียน</p>
+        </div>
+      </div>
+      <div class="header-right">
+        <span class="header-date" id="header-date"></span>
+        <button class="btn btn-outline btn-sm" onclick="window.print()">🖨️ พิมพ์</button>
+      </div>
+    </header>
+
+    <main class="page-content">
+
+      <!-- ── Context Filter Bar ── -->
+      <div class="filter-row" id="context-filter-bar">
+        <label>🏛️ ชั้นเรียน:</label>
+        <select class="filter-select" id="class-filter" onchange="onContextChange()">
+          <option value="">— ทุกชั้นเรียน —</option>
+        </select>
+        <label>📚 วิชา:</label>
+        <select class="filter-select" id="subject-filter" onchange="onContextChange()">
+          <option value="">— ทุกวิชา —</option>
+        </select>
+        <span id="context-badge"></span>
+      </div>
+
+      <!-- ── Tabs ── -->
+      <div class="tab-bar">
+        <button class="tab-btn active" onclick="switchTab('daily')">📅 รายงานรายวัน</button>
+        <button class="tab-btn" onclick="switchTab('semester')">📚 สรุปทั้งเทอม</button>
+        <button class="tab-btn admin-only" style="display:none" onclick="switchTab('manage')">🗑️ จัดการข้อมูล</button>
+      </div>
+
+      <!-- ══ Daily Tab ══ -->
+      <div class="tab-content active" id="tab-daily">
+        <div class="filter-row">
+          <label>📅 วันที่:</label>
+          <input type="date" id="report-date" class="search-input" style="min-width:160px">
+          <button class="btn btn-primary btn-sm" onclick="loadDailyReport()">🔍 ดูรายงาน</button>
+        </div>
+
+        <div id="daily-loading" class="loading" style="display:none"><div class="spinner"></div> กำลังโหลด...</div>
+
+        <div id="daily-content" style="display:none">
+          <!-- Subject label -->
+          <div id="daily-subject-label" style="margin-bottom:16px;display:none">
+            <span id="daily-subject-badge" style="padding:6px 16px;border-radius:20px;font-size:14px;font-weight:700"></span>
+          </div>
+          <div class="stats-grid" style="margin-bottom:20px" id="daily-stats"></div>
+          <div class="card" style="margin-bottom:20px">
+            <div class="card-header"><span class="card-title">📊 สัดส่วนการเข้าเรียน</span></div>
+            <div class="card-body" style="display:flex;align-items:center;gap:24px;flex-wrap:wrap">
+              <div style="width:180px;height:180px;flex-shrink:0"><canvas id="daily-chart"></canvas></div>
+              <div id="daily-chart-legend" style="flex:1"></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">📋 รายละเอียดการเช็กชื่อ</span>
+              <div style="display:flex;align-items:center;gap:8px">
+                <span id="daily-detail-count" style="font-size:13px;color:var(--gray-500)"></span>
+                <button class="btn btn-outline btn-sm" onclick="exportDailyExcel()" id="export-daily-btn" style="display:none">📥 Excel</button>
+              </div>
+            </div>
+            <div class="card-body" style="padding:0">
+              <div class="table-wrapper">
+                <table>
+                  <thead><tr><th>เลขที่</th><th>ชื่อ-สกุล</th><th>ชั้น</th><th>สถานะ</th><th>หมายเหตุ</th><th>เวลาเช็ก</th></tr></thead>
+                  <tbody id="daily-tbody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Date History -->
+        <div class="card" id="date-history-card">
+          <div class="card-header">
+            <span class="card-title">🕐 ประวัติวันที่เช็กชื่อ</span>
+            <button class="btn btn-outline btn-sm" onclick="loadDateHistory()">🔄 รีเฟรช</button>
+          </div>
+          <div class="card-body" style="padding:0" id="date-history-list">
+            <div class="loading"><div class="spinner"></div> กำลังโหลด...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ Semester Tab ══ -->
+      <div class="tab-content" id="tab-semester">
+        <div class="semester-controls">
+          <div class="form-group" style="margin:0">
+            <label class="form-label">วันเริ่มต้น</label>
+            <input type="date" id="sem-start" class="form-control" style="width:160px">
+          </div>
+          <div class="form-group" style="margin:0">
+            <label class="form-label">วันสิ้นสุด</label>
+            <input type="date" id="sem-end" class="form-control" style="width:160px">
+          </div>
+          <button class="btn btn-primary" onclick="loadSemesterReport()">🔍 ค้นหา</button>
+          <button class="btn btn-outline" onclick="loadSemesterReport(true)">📚 ทั้งเทอม</button>
+          <div style="margin-left:auto">
+            <input type="text" id="sem-search" class="search-input" placeholder="🔍 ค้นหาชื่อนักเรียน...">
+          </div>
+        </div>
+
+        <div id="sem-loading" class="loading" style="display:none"><div class="spinner"></div> กำลังโหลด...</div>
+        <div class="stats-grid" id="sem-stats" style="margin-bottom:20px"></div>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">📚 สรุปการเข้าเรียนทั้งเทอม</span>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span id="sem-count" style="font-size:13px;color:var(--gray-500)"></span>
+              <button class="btn btn-outline btn-sm" onclick="exportSemesterExcel()" id="export-sem-btn" style="display:none">📥 Excel</button>
+            </div>
+          </div>
+          <div class="card-body" style="padding:0">
+            <div class="table-wrapper">
+              <table>
+                <thead>
+                  <tr><th>เลขที่</th><th>ชื่อ-สกุล</th><th>ชั้น</th><th>มาเรียน</th><th>ขาด</th><th>ลา</th><th>รวมวัน</th><th>% เข้าเรียน</th></tr>
+                </thead>
+                <tbody id="sem-tbody">
+                  <tr><td colspan="8" style="text-align:center;padding:32px;color:var(--gray-400)">กรุณาเลือกช่วงเวลาแล้วกดค้นหา</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══ Manage Tab (admin only) ══ -->
+      <div class="tab-content" id="tab-manage">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px">
+          <div class="card">
+            <div class="card-header"><span class="card-title">🗑️ ลบข้อมูลตามวันที่</span></div>
+            <div class="card-body">
+              <div class="form-group">
+                <label class="form-label">วันที่ต้องการลบ</label>
+                <input type="date" id="del-date" class="form-control">
+              </div>
+              <div class="form-group">
+                <label class="form-label">ชั้นเรียน</label>
+                <select id="del-date-class" class="form-control"><option value="">— ทุกชั้น —</option></select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">วิชา</label>
+                <select id="del-date-subject" class="form-control"><option value="">— ทุกวิชา —</option></select>
+              </div>
+              <button class="btn btn-danger" style="width:100%" onclick="deleteByDate()">🗑️ ลบ</button>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header"><span class="card-title">📅 ลบข้อมูลช่วงวันที่</span></div>
+            <div class="card-body">
+              <div class="form-group"><label class="form-label">วันเริ่มต้น</label><input type="date" id="del-range-start" class="form-control"></div>
+              <div class="form-group"><label class="form-label">วันสิ้นสุด</label><input type="date" id="del-range-end" class="form-control"></div>
+              <div class="form-group"><label class="form-label">ชั้นเรียน</label><select id="del-range-class" class="form-control"><option value="">— ทุกชั้น —</option></select></div>
+              <div class="form-group"><label class="form-label">วิชา</label><select id="del-range-subject" class="form-control"><option value="">— ทุกวิชา —</option></select></div>
+              <button class="btn btn-danger" style="width:100%" onclick="deleteByRange()">🗑️ ลบช่วงนี้</button>
+            </div>
+          </div>
+          <div class="card" style="border-color:var(--danger)">
+            <div class="card-header" style="background:#fff5f5"><span class="card-title" style="color:var(--danger)">⚠️ ล้างข้อมูลทั้งหมด</span></div>
+            <div class="card-body">
+              <div class="form-group"><label class="form-label">ชั้นเรียน</label><select id="del-all-class" class="form-control"><option value="">— ทุกชั้น —</option></select></div>
+              <div class="form-group"><label class="form-label">วิชา</label><select id="del-all-subject" class="form-control"><option value="">— ทุกวิชา —</option></select></div>
+              <button class="btn btn-danger" style="width:100%;background:#b91c1c" onclick="deleteAll()">⚠️ ล้างทั้งหมด</button>
+            </div>
+          </div>
+        </div>
+        <div class="card" style="margin-top:20px">
+          <div class="card-header">
+            <span class="card-title">📋 รายการวันที่มีข้อมูล</span>
+            <button class="btn btn-outline btn-sm" onclick="loadManageTab()">🔄 รีเฟรช</button>
+          </div>
+          <div class="card-body" style="padding:0" id="manage-date-list">
+            <div class="loading"><div class="spinner"></div></div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script src="assets/js/app.js"></script>
+<script>
+let dailyChart;
+let semesterData = [];
+let mySubjects = []; // teacher's subjects (empty for admin = use all)
+
+// ── Init ───────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  document.getElementById('report-date').value = getTodayISO();
+  document.getElementById('report-date').max   = getTodayISO();
+  await new Promise(r => setTimeout(r, 200)); // wait for app.js loadCurrentUser
+
+  // Build class selector
+  if (currentUser.role === 'admin') {
+    await populateClassSelect('class-filter', 'ทุกชั้นเรียน');
+    await populateSubjectSelect('subject-filter', 'ทุกวิชา');
+    // Show manage tab
+    document.querySelectorAll('.admin-only').forEach(el => el.style.display = '');
+  } else {
+    // Teacher: only their classes
+    const sel = document.getElementById('class-filter');
+    sel.innerHTML = '<option value="">— ทุกชั้นของฉัน —</option>';
+    const myClasses = new Map();
+    (currentUser.homerooms || []).forEach(h => myClasses.set(h.class_id, h));
+    (currentUser.subjects  || []).forEach(s => myClasses.set(s.class_id, s));
+    const byGrade = {};
+    myClasses.forEach(c => { if (!byGrade[c.grade]) byGrade[c.grade] = []; byGrade[c.grade].push(c); });
+    Object.entries(byGrade).sort().forEach(([grade, list]) => {
+      const grp = document.createElement('optgroup');
+      grp.label = grade;
+      list.sort((a,b) => Number(a.room)-Number(b.room)).forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.class_id;
+        opt.textContent = c.class_code;
+        grp.appendChild(opt);
+      });
+      sel.appendChild(grp);
+    });
+
+    // Teacher: only their subjects
+    mySubjects = currentUser.subjects || [];
+    const seen = new Set();
+    const uniqueSubjects = mySubjects.filter(s => {
+      if (seen.has(s.subject_id)) return false; seen.add(s.subject_id); return true;
+    });
+    const subSel = document.getElementById('subject-filter');
+    subSel.innerHTML = '<option value="">— ทุกวิชาของฉัน —</option>';
+    uniqueSubjects.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s.subject_id;
+      opt.textContent = s.icon + ' ' + s.subject_name;
+      subSel.appendChild(opt);
+    });
+  }
+
+  // URL params
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('class_id')) document.getElementById('class-filter').value = params.get('class_id');
+  if (params.get('subject_id')) document.getElementById('subject-filter').value = params.get('subject_id');
+
+  updateContextBadge();
+  loadDateHistory();
+
+  document.getElementById('sem-search')?.addEventListener('input', function() {
+    const q = this.value.toLowerCase();
+    renderSemesterTable(semesterData.filter(r => r.name.toLowerCase().includes(q) || r.student_id.includes(q)));
+  });
+});
+
+// ── Context helpers ────────────────────────────────────────────────────────
+function getClassId()   { return document.getElementById('class-filter')?.value   || ''; }
+function getSubjectId() { return document.getElementById('subject-filter')?.value || ''; }
+
+function buildQueryString(extra = {}) {
+  const p = new URLSearchParams();
+  const cid = getClassId(), sid = getSubjectId();
+  if (cid) p.set('class_id', cid);
+  if (sid) p.set('subject_id', sid);
+  Object.entries(extra).forEach(([k,v]) => { if (v) p.set(k, v); });
+  const s = p.toString();
+  return s ? '?' + s : '';
+}
+
+async function updateContextBadge() {
+  const badge = document.getElementById('context-badge');
+  const cid = getClassId(), sid = getSubjectId();
+  let parts = [];
+  if (cid) {
+    const classes = await loadClasses();
+    const cls = classes.find(c => String(c.id) === String(cid));
+    if (cls) parts.push('<span class="class-badge">🏛️ ' + cls.class_code + '</span>');
+  }
+  if (sid) {
+    const subjects = await loadSubjects();
+    const sub = subjects.find(s => String(s.id) === String(sid));
+    if (sub) parts.push('<span style="padding:4px 12px;border-radius:20px;font-size:13px;font-weight:700;background:' + sub.color + '22;color:' + sub.color + '">' + sub.icon + ' ' + sub.subject_name + '</span>');
+  }
+  badge.innerHTML = parts.join(' ');
+
+  // Update subtitle
+  const sub = document.getElementById('report-subtitle');
+  if (sid) {
+    const subjects = await loadSubjects();
+    const s = subjects.find(x => String(x.id) === String(sid));
+    sub.textContent = s ? 'รายงาน ' + s.subject_name : 'รายงานการเข้าเรียน';
+  } else {
+    sub.textContent = 'รายงานการเข้าเรียน';
+  }
+}
+
+function onContextChange() {
+  updateContextBadge();
+  loadDateHistory();
+  document.getElementById('daily-content').style.display = 'none';
+  document.getElementById('date-history-card').style.display = 'block';
+}
+
+// ── Tab switching ──────────────────────────────────────────────────────────
+function switchTab(tab) {
+  const tabs = ['daily','semester','manage'];
+  tabs.forEach((t,i) => {
+    document.querySelectorAll('.tab-btn')[i]?.classList.toggle('active', t === tab);
+    document.getElementById('tab-' + t)?.classList.toggle('active', t === tab);
+  });
+  if (tab === 'manage') loadManageTab();
+}
+
+// ── Date History ───────────────────────────────────────────────────────────
+async function loadDateHistory() {
+  const q = buildQueryString();
+  try {
+    const dates = await apiFetch('/attendance/dates' + q);
+    const container = document.getElementById('date-history-list');
+    if (dates.length === 0) {
+      container.innerHTML = '<div class="empty-state" style="padding:32px"><div class="empty-icon">📅</div><p>ยังไม่มีข้อมูลการเช็กชื่อ</p></div>';
+      return;
+    }
+    container.innerHTML = dates.map(d => {
+      const pct = d.total > 0 ? ((d.present / d.total) * 100).toFixed(1) : 0;
+      return '<div class="date-history-item" onclick="selectDate(\'' + d.date + '\')">' +
+        '<div><div class="dhi-date">' + formatThaiDate(d.date) + '</div><div style="font-size:12px;color:var(--gray-500)">' + d.date + '</div></div>' +
+        '<div class="dhi-stats">' +
+          '<span class="badge badge-present">✅ ' + (d.present||0) + '</span>' +
+          '<span class="badge badge-absent">❌ ' + (d.absent||0) + '</span>' +
+          '<span class="badge badge-leave">🟡 ' + (d.leave||0) + '</span>' +
+          '<span class="badge" style="background:var(--primary-light);color:var(--primary)">📊 ' + pct + '%</span>' +
+        '</div></div>';
+    }).join('');
+  } catch (e) {
+    showToast('โหลดประวัติไม่สำเร็จ', 'error');
+  }
+}
+
+function selectDate(date) {
+  document.getElementById('report-date').value = date;
+  loadDailyReport();
+  document.getElementById('date-history-card').style.display = 'none';
+}
+
+// ── Daily Report ───────────────────────────────────────────────────────────
+async function loadDailyReport() {
+  const date = document.getElementById('report-date').value;
+  if (!date) { showToast('กรุณาเลือกวันที่', 'warning'); return; }
+
+  document.getElementById('daily-loading').style.display = 'flex';
+  document.getElementById('daily-content').style.display = 'none';
+  document.getElementById('date-history-card').style.display = 'none';
+
+  try {
+    const q = buildQueryString();
+    const data = await apiFetch('/attendance/report/daily/' + date + q);
+    const s = data.summary;
+
+    // Subject label
+    const sid = getSubjectId();
+    const subLabelEl = document.getElementById('daily-subject-label');
+    const subBadgeEl = document.getElementById('daily-subject-badge');
+    if (sid) {
+      const subjects = await loadSubjects();
+      const sub = subjects.find(x => String(x.id) === String(sid));
+      if (sub) {
+        subBadgeEl.textContent = sub.icon + ' ' + sub.subject_name;
+        subBadgeEl.style.cssText = 'padding:6px 16px;border-radius:20px;font-size:14px;font-weight:700;background:' + sub.color + '22;color:' + sub.color;
+        subLabelEl.style.display = 'block';
+      }
+    } else {
+      subLabelEl.style.display = 'none';
+    }
+
+    document.getElementById('daily-stats').innerHTML =
+      '<div class="stat-card"><div class="stat-icon blue">👨‍🎓</div><div class="stat-info"><div class="stat-value">' + s.total + '</div><div class="stat-label">นักเรียนทั้งหมด</div></div></div>' +
+      '<div class="stat-card"><div class="stat-icon green">✅</div><div class="stat-info"><div class="stat-value">' + (s.present||0) + '</div><div class="stat-label">มาเรียน</div></div></div>' +
+      '<div class="stat-card"><div class="stat-icon red">❌</div><div class="stat-info"><div class="stat-value">' + (s.absent||0) + '</div><div class="stat-label">ขาดเรียน</div></div></div>' +
+      '<div class="stat-card"><div class="stat-icon yellow">🟡</div><div class="stat-info"><div class="stat-value">' + (s.leave||0) + '</div><div class="stat-label">ลา</div></div></div>' +
+      '<div class="stat-card"><div class="stat-icon purple">📊</div><div class="stat-info"><div class="stat-value">' + s.percent + '%</div><div class="stat-label">% เข้าเรียน</div></div></div>';
+
+    if (dailyChart) dailyChart.destroy();
+    dailyChart = new Chart(document.getElementById('daily-chart'), {
+      type: 'doughnut',
+      data: { labels: ['มาเรียน','ขาด','ลา'], datasets: [{ data: [s.present||0, s.absent||0, s.leave||0], backgroundColor: ['#16a34a','#dc2626','#d97706'], borderWidth: 0 }] },
+      options: { responsive: true, maintainAspectRatio: false, cutout: '60%', plugins: { legend: { display: false } } }
+    });
+    document.getElementById('daily-chart-legend').innerHTML =
+      '<div style="display:flex;flex-direction:column;gap:10px">' +
+      [['#16a34a','มาเรียน',s.present||0],['#dc2626','ขาดเรียน',s.absent||0],['#d97706','ลา',s.leave||0]].map(([c,l,v]) =>
+        '<div style="display:flex;align-items:center;gap:10px"><span style="width:14px;height:14px;border-radius:50%;background:' + c + ';display:inline-block"></span><span style="font-size:14px">' + l + ': <b>' + v + ' คน</b></span></div>'
+      ).join('') +
+      '<div style="margin-top:8px;padding:12px;background:var(--primary-light);border-radius:8px"><div style="font-size:22px;font-weight:800;color:var(--primary)">' + s.percent + '%</div><div style="font-size:12px;color:var(--primary)">เปอร์เซ็นต์เข้าเรียน</div></div></div>';
+
+    document.getElementById('daily-detail-count').textContent = data.details.length + ' คน';
+    document.getElementById('export-daily-btn').style.display = data.details.length > 0 ? '' : 'none';
+    document.getElementById('daily-tbody').innerHTML = data.details.map(r => {
+      const rowClass = r.status ? 'row-' + r.status : '';
+      const time = r.checked_at ? new Date(r.checked_at).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'}) : '—';
+      return '<tr class="' + rowClass + '">' +
+        '<td style="text-align:center;font-weight:700">' + r.number + '</td>' +
+        '<td><b>' + r.name + '</b></td>' +
+        '<td><span class="class-badge" style="font-size:12px">' + r.class + '</span></td>' +
+        '<td>' + statusBadge(r.status) + '</td>' +
+        '<td style="font-size:13px;color:var(--gray-600)">' + (r.note || '—') + '</td>' +
+        '<td style="font-size:13px;color:var(--gray-500)">' + time + '</td>' +
+      '</tr>';
+    }).join('');
+
+    document.getElementById('daily-loading').style.display = 'none';
+    document.getElementById('daily-content').style.display = 'block';
+  } catch (e) {
+    document.getElementById('daily-loading').style.display = 'none';
+    showToast('โหลดรายงานไม่สำเร็จ: ' + e.message, 'error');
+  }
+}
+
+// ── Semester Report ────────────────────────────────────────────────────────
+async function loadSemesterReport(all = false) {
+  const start = all ? '' : document.getElementById('sem-start').value;
+  const end   = all ? '' : document.getElementById('sem-end').value;
+
+  // Validate date range
+  if (!all && start && end && start > end) {
+    showToast('วันเริ่มต้นต้องไม่มากกว่าวันสิ้นสุด', 'warning');
+    return;
+  }
+  if (!all && (!start || !end)) {
+    showToast('กรุณาเลือกวันเริ่มต้นและวันสิ้นสุด หรือกด "ทั้งเทอม"', 'warning');
+    return;
+  }
+
+  document.getElementById('sem-loading').style.display = 'flex';
+  document.getElementById('sem-tbody').innerHTML = '';
+  try {
+    const extra = {};
+    if (start && end) { extra.start = start; extra.end = end; }
+    semesterData = await apiFetch('/attendance/report/semester' + buildQueryString(extra));
+    renderSemesterTable(semesterData);
+    const tp = semesterData.reduce((a,r) => a+(r.present||0), 0);
+    const ta = semesterData.reduce((a,r) => a+(r.absent||0), 0);
+    const tl = semesterData.reduce((a,r) => a+(r.leave||0), 0);
+    const avg = semesterData.length > 0 ? (semesterData.reduce((a,r) => a+parseFloat(r.percent||0), 0)/semesterData.length).toFixed(1) : 0;
+    document.getElementById('sem-stats').innerHTML =
+      '<div class="stat-card"><div class="stat-icon green">✅</div><div class="stat-info"><div class="stat-value">' + tp + '</div><div class="stat-label">รวมวันมาเรียน</div></div></div>' +
+      '<div class="stat-card"><div class="stat-icon red">❌</div><div class="stat-info"><div class="stat-value">' + ta + '</div><div class="stat-label">รวมวันขาด</div></div></div>' +
+      '<div class="stat-card"><div class="stat-icon yellow">🟡</div><div class="stat-info"><div class="stat-value">' + tl + '</div><div class="stat-label">รวมวันลา</div></div></div>' +
+      '<div class="stat-card"><div class="stat-icon purple">📊</div><div class="stat-info"><div class="stat-value">' + avg + '%</div><div class="stat-label">เฉลี่ยเข้าเรียน</div></div></div>';
+    document.getElementById('sem-count').textContent = semesterData.length + ' คน';
+    document.getElementById('export-sem-btn').style.display = semesterData.length > 0 ? '' : 'none';
+  } catch (e) {
+    showToast('โหลดข้อมูลไม่สำเร็จ: ' + e.message, 'error');
+  } finally {
+    document.getElementById('sem-loading').style.display = 'none';
+  }
+}
+
+function renderSemesterTable(data) {
+  const tbody = document.getElementById('sem-tbody');
+  if (data.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--gray-400)">ไม่พบข้อมูล</td></tr>';
+    return;
+  }
+  tbody.innerHTML = data.map(r => {
+    const pct = parseFloat(r.percent || 0);
+    const cls = percentClass(pct);
+    return '<tr>' +
+      '<td style="text-align:center;font-weight:700">' + r.number + '</td>' +
+      '<td><div style="display:flex;align-items:center;gap:8px">' + avatarHtml(r) +
+        '<div><div style="font-weight:600">' + r.name + '</div><div style="font-size:12px;color:var(--gray-500)">' + r.student_id + '</div></div></div></td>' +
+      '<td><span class="class-badge" style="font-size:12px">' + r.class + '</span></td>' +
+      '<td><span class="badge badge-present">' + (r.present||0) + '</span></td>' +
+      '<td><span class="badge badge-absent">' + (r.absent||0) + '</span></td>' +
+      '<td><span class="badge badge-leave">' + (r.leave||0) + '</span></td>' +
+      '<td style="font-weight:600">' + (r.total_days||0) + '</td>' +
+      '<td><div style="display:flex;align-items:center;gap:8px">' +
+        '<div class="progress-bar" style="flex:1;min-width:60px"><div class="progress-fill ' + cls + '" style="width:' + pct + '%"></div></div>' +
+        '<span class="percent-circle ' + cls + '" style="width:44px;height:44px;font-size:11px">' + pct + '%</span>' +
+      '</div></td></tr>';
+  }).join('');
+}
+
+// ── Manage Tab (admin only) ────────────────────────────────────────────────
+async function loadManageTab() {
+  for (const id of ['del-date-class','del-range-class','del-all-class']) await populateClassSelect(id, 'ทุกชั้น');
+  for (const id of ['del-date-subject','del-range-subject','del-all-subject']) await populateSubjectSelect(id, 'ทุกวิชา');
+  const q = buildQueryString();
+  const container = document.getElementById('manage-date-list');
+  try {
+    const dates = await apiFetch('/attendance/dates' + q);
+    if (dates.length === 0) {
+      container.innerHTML = '<div class="empty-state" style="padding:32px"><div class="empty-icon">📅</div><p>ไม่มีข้อมูล</p></div>';
+      return;
+    }
+    container.innerHTML = '<table style="width:100%;font-size:14px;border-collapse:collapse"><thead><tr style="background:var(--gray-50)">' +
+      '<th style="padding:10px 16px;text-align:left;font-size:12px;color:var(--gray-500);border-bottom:1px solid var(--gray-200)">วันที่</th>' +
+      '<th style="padding:10px 16px;text-align:center;font-size:12px;color:var(--gray-500);border-bottom:1px solid var(--gray-200)">มา</th>' +
+      '<th style="padding:10px 16px;text-align:center;font-size:12px;color:var(--gray-500);border-bottom:1px solid var(--gray-200)">ขาด</th>' +
+      '<th style="padding:10px 16px;text-align:center;font-size:12px;color:var(--gray-500);border-bottom:1px solid var(--gray-200)">ลา</th>' +
+      '<th style="padding:10px 16px;text-align:center;font-size:12px;color:var(--gray-500);border-bottom:1px solid var(--gray-200)">รวม</th>' +
+      '<th style="padding:10px 16px;border-bottom:1px solid var(--gray-200)"></th></tr></thead><tbody>' +
+      dates.map(d => '<tr id="manage-row-' + d.date + '" style="border-bottom:1px solid var(--gray-100)">' +
+        '<td style="padding:10px 16px"><b>' + formatThaiDate(d.date) + '</b><div style="font-size:11px;color:var(--gray-400)">' + d.date + '</div></td>' +
+        '<td style="padding:10px 16px;text-align:center"><span class="badge badge-present">' + (d.present||0) + '</span></td>' +
+        '<td style="padding:10px 16px;text-align:center"><span class="badge badge-absent">' + (d.absent||0) + '</span></td>' +
+        '<td style="padding:10px 16px;text-align:center"><span class="badge badge-leave">' + (d.leave||0) + '</span></td>' +
+        '<td style="padding:10px 16px;text-align:center;font-weight:700">' + d.total + '</td>' +
+        '<td style="padding:10px 16px;text-align:right"><button class="btn btn-danger btn-sm" onclick="deleteSingleDate(\'' + d.date + '\')">🗑️ ลบ</button></td>' +
+      '</tr>').join('') + '</tbody></table>';
+  } catch(e) { container.innerHTML = '<div style="padding:24px;color:var(--danger)">โหลดไม่สำเร็จ</div>'; }
+}
+
+async function deleteSingleDate(date) {
+  if (!confirm('ยืนยันลบข้อมูลวันที่ ' + formatThaiDate(date) + '?')) return;
+  try {
+    await apiFetch('/attendance/date/' + date + buildQueryString(), { method: 'DELETE' });
+    showToast('ลบเรียบร้อย', 'success');
+    document.getElementById('manage-row-' + date)?.remove();
+  } catch(e) { showToast('ลบไม่สำเร็จ: ' + e.message, 'error'); }
+}
+
+async function deleteByDate() {
+  const date = document.getElementById('del-date').value;
+  const cid  = document.getElementById('del-date-class').value;
+  const sid  = document.getElementById('del-date-subject').value;
+  if (!date) { showToast('กรุณาเลือกวันที่', 'warning'); return; }
+  if (!confirm('ยืนยันลบข้อมูลวันที่ ' + formatThaiDate(date) + '?')) return;
+  const p = new URLSearchParams(); if (cid) p.set('class_id',cid); if (sid) p.set('subject_id',sid);
+  try { await apiFetch('/attendance/date/' + date + (p.toString() ? '?' + p : ''), { method: 'DELETE' }); showToast('ลบเรียบร้อย','success'); loadManageTab(); }
+  catch(e) { showToast(e.message,'error'); }
+}
+
+async function deleteByRange() {
+  const start = document.getElementById('del-range-start').value;
+  const end   = document.getElementById('del-range-end').value;
+  const cid   = document.getElementById('del-range-class').value;
+  const sid   = document.getElementById('del-range-subject').value;
+  if (!start || !end) { showToast('กรุณาเลือกวันเริ่มต้นและสิ้นสุด','warning'); return; }
+  if (!confirm('ยืนยันลบข้อมูลช่วง ' + formatThaiDate(start) + ' ถึง ' + formatThaiDate(end) + '?')) return;
+  const p = new URLSearchParams(); if (cid) p.set('class_id',cid); if (sid) p.set('subject_id',sid);
+  const q = p.toString() ? '?' + p : '';
+  try {
+    const dates = await apiFetch('/attendance/dates' + q);
+    const inRange = dates.filter(d => d.date >= start && d.date <= end);
+    if (!inRange.length) { showToast('ไม่พบข้อมูลในช่วงนี้','warning'); return; }
+    for (const d of inRange) await apiFetch('/attendance/date/' + d.date + q, { method: 'DELETE' });
+    showToast('ลบ ' + inRange.length + ' วัน เรียบร้อย','success'); loadManageTab();
+  } catch(e) { showToast(e.message,'error'); }
+}
+
+async function deleteAll() {
+  const cid = document.getElementById('del-all-class').value;
+  const sid = document.getElementById('del-all-subject').value;
+  if (!confirm('⚠️ ยืนยันล้างข้อมูลทั้งหมด?\nไม่สามารถกู้คืนได้')) return;
+  if (!confirm('ยืนยันอีกครั้ง: ล้างข้อมูลทั้งหมด?')) return;
+  const p = new URLSearchParams(); if (cid) p.set('class_id',cid); if (sid) p.set('subject_id',sid);
+  try { await apiFetch('/attendance/all' + (p.toString() ? '?' + p : ''), { method: 'DELETE' }); showToast('ล้างข้อมูลเรียบร้อย','success'); loadManageTab(); }
+  catch(e) { showToast(e.message,'error'); }
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// Export Excel
+// ══════════════════════════════════════════════════════════════════════════
+
+// helper: สร้าง workbook แล้ว download
+function downloadXlsx(wb, filename) {
+  XLSX.writeFile(wb, filename);
+}
+
+// helper: แปลงสถานะเป็นข้อความ
+function statusText(s) {
+  return s === 'present' ? 'มาเรียน' : s === 'absent' ? 'ขาดเรียน' : s === 'leave' ? 'ลา' : 'ยังไม่เช็ก';
+}
+
+// helper: ชื่อไฟล์ปลอดภัย
+function safeFilename(str) {
+  return str.replace(/[\/\\:*?"<>|]/g, '_');
+}
+
+// ── Export รายงานรายวัน ────────────────────────────────────────────────────
+async function exportDailyExcel() {
+  const date      = document.getElementById('report-date').value;
+  const classId   = getClassId();
+  const subjectId = getSubjectId();
+  if (!date) { showToast('กรุณาเลือกวันที่ก่อน', 'warning'); return; }
+
+  try {
+    const q    = buildQueryString();
+    const data = await apiFetch('/attendance/report/daily/' + date + q);
+    const s    = data.summary;
+
+    const classes  = await loadClasses();
+    const subjects = await loadSubjects();
+    const className  = classId   ? (classes.find(c => String(c.id) === classId)?.class_code  || 'ทุกชั้น') : 'ทุกชั้น';
+    const subjectName = subjectId ? (subjects.find(x => String(x.id) === subjectId)?.subject_name || '') : '';
+
+    // ── สร้าง rows ทั้งหมดในชีตเดียว ──────────────────────────────────────
+    const aoa = [];
+
+    // แถวหัวข้อ
+    aoa.push(['รายงานการเข้าเรียนรายวัน']);
+    aoa.push(['วันที่', formatThaiDate(date), '', 'ชั้นเรียน', className]);
+    if (subjectName) aoa.push(['วิชา', subjectName]);
+    aoa.push([]); // เว้นบรรทัด
+
+    // แถวสรุปสถิติ
+    aoa.push([
+      'นักเรียนทั้งหมด', s.total, '',
+      'มาเรียน', s.present || 0, '',
+      'ขาดเรียน', s.absent || 0, '',
+      'ลา', s.leave || 0, '',
+      '% เข้าเรียน', (s.percent || 0) + '%',
+    ]);
+    aoa.push([]); // เว้นบรรทัด
+
+    // แถว header ตาราง
+    const headerRow = ['เลขที่', 'ชื่อ-สกุล', 'ชั้น', 'สถานะ', 'หมายเหตุ', 'เวลาเช็ก'];
+    aoa.push(headerRow);
+    const headerRowIdx = aoa.length - 1;
+
+    // แถวข้อมูล
+    data.details.forEach(r => {
+      aoa.push([
+        r.number,
+        r.name,
+        r.class,
+        statusText(r.status),
+        r.note || '—',
+        r.checked_at
+          ? new Date(r.checked_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })
+          : '—',
+      ]);
+    });
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+    // ความกว้างคอลัมน์
+    ws['!cols'] = [
+      { wch: 8  },  // เลขที่
+      { wch: 32 },  // ชื่อ-สกุล
+      { wch: 10 },  // ชั้น
+      { wch: 12 },  // สถานะ
+      { wch: 30 },  // หมายเหตุ
+      { wch: 10 },  // เวลาเช็ก
+    ];
+
+    // Style แถว header ตาราง
+    styleHeaderRow(ws, headerRow.length, headerRowIdx);
+
+    // Style แถวหัวข้อรายงาน (ตัวหนา)
+    const titleCell = XLSX.utils.encode_cell({ r: 0, c: 0 });
+    if (ws[titleCell]) ws[titleCell].s = { font: { bold: true, sz: 14 } };
+
+    XLSX.utils.book_append_sheet(wb, ws, 'รายงานรายวัน');
+    downloadXlsx(wb, `รายงานรายวัน_${className}_${date}.xlsx`);
+    showToast('ส่งออก Excel เรียบร้อย', 'success');
+  } catch (e) {
+    showToast('ส่งออกไม่สำเร็จ: ' + e.message, 'error');
+  }
+}
+
+// ── Export สรุปทั้งเทอม ────────────────────────────────────────────────────
+async function exportSemesterExcel() {
+  if (!semesterData.length) { showToast('ไม่มีข้อมูลที่จะส่งออก', 'warning'); return; }
+
+  const classId   = getClassId();
+  const subjectId = getSubjectId();
+  const start = document.getElementById('sem-start').value;
+  const end   = document.getElementById('sem-end').value;
+
+  try {
+    const classes  = await loadClasses();
+    const subjects = await loadSubjects();
+    const className   = classId   ? (classes.find(c => String(c.id) === classId)?.class_code    || 'ทุกชั้น') : 'ทุกชั้น';
+    const subjectName = subjectId ? (subjects.find(x => String(x.id) === subjectId)?.subject_name || '') : '';
+
+    const tp  = semesterData.reduce((a, r) => a + (r.present || 0), 0);
+    const ta  = semesterData.reduce((a, r) => a + (r.absent  || 0), 0);
+    const tl  = semesterData.reduce((a, r) => a + (r.leave   || 0), 0);
+    const avg = semesterData.length > 0
+      ? (semesterData.reduce((a, r) => a + parseFloat(r.percent || 0), 0) / semesterData.length).toFixed(1)
+      : 0;
+
+    const aoa = [];
+
+    // หัวข้อ
+    aoa.push(['รายงานสรุปการเข้าเรียนทั้งเทอม']);
+    aoa.push(['ชั้นเรียน', className, '', 'จำนวนนักเรียน', semesterData.length + ' คน']);
+    if (subjectName) aoa.push(['วิชา', subjectName]);
+    if (start && end) aoa.push(['ช่วงเวลา', `${formatThaiDate(start)} – ${formatThaiDate(end)}`]);
+    aoa.push([]); // เว้นบรรทัด
+
+    // สรุปสถิติ
+    aoa.push([
+      'รวมวันมาเรียน', tp, '',
+      'รวมวันขาด', ta, '',
+      'รวมวันลา', tl, '',
+      'เฉลี่ยเข้าเรียน', avg + '%',
+    ]);
+    aoa.push([]);
+
+    // header ตาราง
+    const headerRow = ['เลขที่', 'รหัสนักเรียน', 'ชื่อ-นามสกุล', 'ชั้น', 'มาเรียน', 'ขาดเรียน', 'ลา', 'รวมวัน', '% เข้าเรียน'];
+    aoa.push(headerRow);
+    const headerRowIdx = aoa.length - 1;
+
+    // ข้อมูล
+    semesterData.forEach(r => {
+      aoa.push([
+        r.number,
+        r.student_id,
+        r.name,
+        r.class,
+        r.present    || 0,
+        r.absent     || 0,
+        r.leave      || 0,
+        r.total_days || 0,
+        parseFloat(r.percent || 0),
+      ]);
+    });
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+    ws['!cols'] = [
+      { wch: 8  },  // เลขที่
+      { wch: 14 },  // รหัส
+      { wch: 32 },  // ชื่อ
+      { wch: 10 },  // ชั้น
+      { wch: 10 },  // มา
+      { wch: 10 },  // ขาด
+      { wch: 8  },  // ลา
+      { wch: 10 },  // รวม
+      { wch: 14 },  // %
+    ];
+
+    styleHeaderRow(ws, headerRow.length, headerRowIdx);
+
+    const titleCell = XLSX.utils.encode_cell({ r: 0, c: 0 });
+    if (ws[titleCell]) ws[titleCell].s = { font: { bold: true, sz: 14 } };
+
+    const classPart = safeFilename(className);
+    const datePart  = start && end ? `_${start}_${end}` : '';
+    XLSX.utils.book_append_sheet(wb, ws, 'สรุปทั้งเทอม');
+    downloadXlsx(wb, `สรุปทั้งเทอม_${classPart}${datePart}.xlsx`);
+    showToast('ส่งออก Excel เรียบร้อย', 'success');
+  } catch (e) {
+    showToast('ส่งออกไม่สำเร็จ: ' + e.message, 'error');
+  }
+}
+
+// ── Style header row (bold + bg) ───────────────────────────────────────────
+function styleHeaderRow(ws, colCount, rowIdx = 0) {
+  for (let c = 0; c < colCount; c++) {
+    const cellRef = XLSX.utils.encode_cell({ r: rowIdx, c });
+    if (!ws[cellRef]) continue;
+    ws[cellRef].s = {
+      font:      { bold: true, color: { rgb: 'FFFFFF' } },
+      fill:      { patternType: 'solid', fgColor: { rgb: '4F46E5' } },
+      alignment: { horizontal: 'center', vertical: 'center' },
+      border: {
+        bottom: { style: 'thin', color: { rgb: 'CCCCCC' } },
+      },
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>QR Code – ระบบเช็กชื่อนักเรียน</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/style.css">
+  <!-- html5-qrcode for scanning -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <style>
+    .qr-tabs {
+      display: flex;
+      gap: 4px;
+      background: var(--gray-100);
+      border-radius: 10px;
+      padding: 4px;
+      margin-bottom: 20px;
+    }
+    .qr-tab-btn {
+      flex: 1;
+      padding: 10px 16px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      background: transparent;
+      color: var(--gray-500);
+      transition: all .2s;
+      font-family: inherit;
+    }
+    .qr-tab-btn.active {
+      background: white;
+      color: var(--primary);
+      box-shadow: var(--shadow);
+    }
+    .qr-tab-content { display: none; }
+    .qr-tab-content.active { display: block; }
+
+    /* QR Cards Grid */
+    .qr-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 16px;
+    }
+    .qr-card {
+      background: white;
+      border: 1px solid var(--gray-200);
+      border-radius: var(--radius);
+      padding: 20px;
+      text-align: center;
+      transition: all .2s;
+    }
+    .qr-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
+    .qr-card img { width: 160px; height: 160px; margin: 0 auto 12px; display: block; }
+    .qr-card .qr-name { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+    .qr-card .qr-meta { font-size: 12px; color: var(--gray-500); margin-bottom: 12px; }
+    .qr-card .qr-actions { display: flex; gap: 6px; justify-content: center; }
+
+    /* Scanner */
+    .scanner-container {
+      max-width: 500px;
+      margin: 0 auto;
+    }
+    #qr-reader {
+      border-radius: var(--radius);
+      overflow: hidden;
+      border: 2px solid var(--gray-200);
+    }
+    .scan-result {
+      margin-top: 16px;
+      padding: 16px;
+      border-radius: var(--radius);
+      display: none;
+    }
+    .scan-result.success { background: var(--success-light); border: 1px solid var(--success); }
+    .scan-result.error   { background: var(--danger-light);  border: 1px solid var(--danger); }
+    .scan-result-name { font-size: 18px; font-weight: 800; margin-bottom: 4px; }
+    .scan-result-meta { font-size: 13px; color: var(--gray-600); }
+    .scan-log {
+      margin-top: 16px;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    .scan-log-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--gray-100);
+      font-size: 13px;
+    }
+    .scan-log-item:last-child { border-bottom: none; }
+    .scan-log-time { color: var(--gray-400); white-space: nowrap; }
+    .scanner-controls {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .scan-date-label { font-size: 13px; font-weight: 600; color: var(--gray-600); }
+
+    /* Print QR */
+    @media print {
+      .sidebar, .top-header, .qr-tabs, .qr-actions, .scanner-controls { display: none !important; }
+      .main-content { margin-left: 0 !important; }
+      .qr-grid { grid-template-columns: repeat(3, 1fr); }
+      .qr-card { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">🏫</div>
+      <div class="logo-text"><h2>ระบบเช็กชื่อ</h2><span>นักเรียน</span></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-title">เมนูหลัก</div>
+      <a href="index.html" class="nav-item"><span class="nav-icon">📊</span> Dashboard</a>
+      <a href="attendance.html" class="nav-item"><span class="nav-icon">✅</span> เช็กชื่อ</a>
+      <a href="report.html" class="nav-item"><span class="nav-icon">📋</span> รายงาน</a>
+      <div class="nav-section-title">จัดการ</div>
+      <a href="classes.html"  class="nav-item admin-only" style="display:none"><span class="nav-icon">🏛️</span> จัดการชั้นเรียน</a>
+      <a href="students.html" class="nav-item"><span class="nav-icon">👨‍🎓</span> ข้อมูลนักเรียน</a>
+      <a href="qrcode.html"   class="nav-item active"><span class="nav-icon">📷</span> QR Code</a>
+      <a href="users.html"    class="nav-item admin-only" style="display:none"><span class="nav-icon">👥</span> จัดการผู้ใช้</a>
+      <div class="nav-section-title">บัญชีของฉัน</div>
+      <a href="profile.html"  class="nav-item"><span class="nav-icon">⚙️</span> ตั้งค่าการสอน</a>
+    </nav>
+    <div class="user-panel">
+      <div class="user-avatar-circle" id="user-avatar">?</div>
+      <div class="user-info"><div class="u-name" id="user-name">กำลังโหลด...</div><div class="u-role" id="user-role"></div></div>
+      <button class="logout-btn" onclick="logout()" title="ออกจากระบบ">🚪</button>
+    </div>
+  </aside>
+  <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+  <div class="main-content">
+    <header class="top-header">
+      <div class="header-left">
+        <button class="menu-toggle" id="menu-toggle">☰</button>
+        <div class="page-title">
+          <h1>📷 QR Code</h1>
+          <p>สร้างและสแกน QR Code เช็กชื่อ</p>
+        </div>
+      </div>
+      <div class="header-right">
+        <span class="header-date" id="header-date"></span>
+        <button class="btn btn-outline btn-sm" onclick="window.print()">🖨️ พิมพ์ QR</button>
+      </div>
+    </header>
+
+    <main class="page-content">
+      <div class="qr-tabs">
+        <button class="qr-tab-btn active" onclick="switchQrTab('generate')">🔲 QR Code นักเรียน</button>
+        <button class="qr-tab-btn" onclick="switchQrTab('scan')">📷 สแกนเช็กชื่อ</button>
+      </div>
+
+      <!-- Generate Tab -->
+      <div class="qr-tab-content active" id="qtab-generate">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+          <p style="font-size:14px;color:var(--gray-500)">QR Code สำหรับนักเรียนแต่ละคน ใช้สแกนเพื่อเช็กชื่ออัตโนมัติ</p>
+          <button class="btn btn-primary btn-sm" onclick="loadAllQR()">🔄 โหลด QR ทั้งหมด</button>
+        </div>
+        <div id="qr-loading" class="loading"><div class="spinner"></div> กำลังสร้าง QR Code...</div>
+        <div class="qr-grid" id="qr-grid" style="display:none"></div>
+      </div>
+
+      <!-- Scan Tab -->
+      <div class="qr-tab-content" id="qtab-scan">
+        <div class="scanner-container">
+          <div class="scanner-controls">
+            <span class="scan-date-label">📅 วันที่เช็กชื่อ:</span>
+            <input type="date" id="scan-date" class="form-control" style="width:160px">
+            <button class="btn btn-primary" id="start-scan-btn" onclick="startScanner()">📷 เปิดกล้อง</button>
+            <button class="btn btn-outline" id="stop-scan-btn" onclick="stopScanner()" style="display:none">⏹️ หยุด</button>
+          </div>
+
+          <div id="qr-reader"></div>
+
+          <div class="scan-result" id="scan-result">
+            <div style="display:flex;align-items:center;gap:12px">
+              <span style="font-size:36px" id="scan-icon">✅</span>
+              <div>
+                <div class="scan-result-name" id="scan-name"></div>
+                <div class="scan-result-meta" id="scan-meta"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Scan Log -->
+          <div class="card" style="margin-top:16px" id="scan-log-card">
+            <div class="card-header">
+              <span class="card-title">📋 ประวัติการสแกน</span>
+              <button class="btn btn-outline btn-sm" onclick="clearLog()">🗑️ ล้าง</button>
+            </div>
+            <div class="card-body" style="padding:0">
+              <div class="scan-log" id="scan-log">
+                <div style="text-align:center;padding:24px;color:var(--gray-400);font-size:13px">
+                  ยังไม่มีการสแกน
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- QR Detail Modal -->
+<div class="modal-overlay" id="qr-modal">
+  <div class="modal" style="max-width:360px">
+    <div class="modal-header">
+      <span class="modal-title" id="qr-modal-title">QR Code</span>
+      <button class="modal-close" onclick="closeModal('qr-modal')">✕</button>
+    </div>
+    <div class="modal-body" style="text-align:center">
+      <img id="qr-modal-img" src="" alt="QR Code" style="width:220px;height:220px;margin:0 auto 12px;display:block">
+      <p id="qr-modal-name" style="font-size:16px;font-weight:700;margin-bottom:4px"></p>
+      <p id="qr-modal-meta" style="font-size:13px;color:var(--gray-500);margin-bottom:16px"></p>
+      <button class="btn btn-primary" onclick="downloadQR()">⬇️ ดาวน์โหลด</button>
+    </div>
+  </div>
+</div>
+
+<script src="assets/js/app.js"></script>
+<script>
+let html5QrCode = null;
+let scanLog = [];
+let currentQrData = null;
+
+function switchQrTab(tab) {
+  document.querySelectorAll('.qr-tab-btn').forEach((b,i) => {
+    b.classList.toggle('active', (i===0 && tab==='generate') || (i===1 && tab==='scan'));
+  });
+  document.getElementById('qtab-generate').classList.toggle('active', tab==='generate');
+  document.getElementById('qtab-scan').classList.toggle('active', tab==='scan');
+  if (tab === 'generate' && document.getElementById('qr-grid').style.display === 'none') {
+    loadAllQR();
+  }
+  if (tab !== 'scan' && html5QrCode) stopScanner();
+}
+
+async function loadAllQR() {
+  document.getElementById('qr-loading').style.display = 'flex';
+  document.getElementById('qr-grid').style.display = 'none';
+  try {
+    const students = await apiFetch('/students');
+    const qrGrid = document.getElementById('qr-grid');
+    qrGrid.innerHTML = '';
+
+    for (const s of students) {
+      const data = await apiFetch(`/students/${s.student_id}/qr`);
+      const card = document.createElement('div');
+      card.className = 'qr-card';
+      card.innerHTML = `
+        <img src="${data.qr}" alt="QR ${s.name}">
+        <div class="qr-name">${s.name}</div>
+        <div class="qr-meta">รหัส: ${s.student_id} | ชั้น: ${s.class} | เลขที่: ${s.number}</div>
+        <div class="qr-actions">
+          <button class="btn btn-outline btn-sm" onclick="showQrModal('${s.student_id}','${s.name}','${s.class}','${s.number}','${data.qr}')">🔍 ขยาย</button>
+          <button class="btn btn-primary btn-sm" onclick="downloadQRDirect('${data.qr}','${s.student_id}')">⬇️</button>
+        </div>`;
+      qrGrid.appendChild(card);
+    }
+
+    document.getElementById('qr-loading').style.display = 'none';
+    qrGrid.style.display = 'grid';
+  } catch (e) {
+    document.getElementById('qr-loading').style.display = 'none';
+    showToast('โหลด QR ไม่สำเร็จ: ' + e.message, 'error');
+  }
+}
+
+function showQrModal(id, name, cls, num, qrSrc) {
+  currentQrData = { id, name, qrSrc };
+  document.getElementById('qr-modal-title').textContent = `QR Code – ${name}`;
+  document.getElementById('qr-modal-img').src = qrSrc;
+  document.getElementById('qr-modal-name').textContent = name;
+  document.getElementById('qr-modal-meta').textContent = `รหัส: ${id} | ชั้น: ${cls} | เลขที่: ${num}`;
+  openModal('qr-modal');
+}
+
+function downloadQR() {
+  if (!currentQrData) return;
+  downloadQRDirect(currentQrData.qrSrc, currentQrData.id);
+}
+
+function downloadQRDirect(src, id) {
+  const a = document.createElement('a');
+  a.href = src;
+  a.download = `qr-${id}.png`;
+  a.click();
+}
+
+// Scanner
+async function startScanner() {
+  const date = document.getElementById('scan-date').value;
+  if (!date) { showToast('กรุณาเลือกวันที่ก่อนสแกน', 'warning'); return; }
+
+  document.getElementById('start-scan-btn').style.display = 'none';
+  document.getElementById('stop-scan-btn').style.display = 'inline-flex';
+
+  html5QrCode = new Html5Qrcode('qr-reader');
+  try {
+    await html5QrCode.start(
+      { facingMode: 'environment' },
+      { fps: 10, qrbox: { width: 250, height: 250 } },
+      onScanSuccess,
+      () => {}
+    );
+  } catch (e) {
+    showToast('ไม่สามารถเปิดกล้องได้: ' + e.message, 'error');
+    document.getElementById('start-scan-btn').style.display = 'inline-flex';
+    document.getElementById('stop-scan-btn').style.display = 'none';
+  }
+}
+
+async function stopScanner() {
+  if (html5QrCode) {
+    try { await html5QrCode.stop(); } catch(e) {}
+    html5QrCode = null;
+  }
+  document.getElementById('start-scan-btn').style.display = 'inline-flex';
+  document.getElementById('stop-scan-btn').style.display = 'none';
+  document.getElementById('qr-reader').innerHTML = '';
+}
+
+let lastScanned = '';
+let scanCooldown = false;
+
+async function onScanSuccess(decodedText) {
+  if (scanCooldown || decodedText === lastScanned) return;
+  lastScanned = decodedText;
+  scanCooldown = true;
+  setTimeout(() => { scanCooldown = false; lastScanned = ''; }, 3000);
+
+  const date = document.getElementById('scan-date').value;
+  let studentData;
+  try {
+    studentData = JSON.parse(decodedText);
+  } catch {
+    showScanResult(false, 'QR Code ไม่ถูกต้อง', '');
+    return;
+  }
+
+  try {
+    const result = await apiFetch('/attendance/qr-checkin', {
+      method: 'POST',
+      body: JSON.stringify({ student_id: studentData.student_id, date })
+    });
+    showScanResult(true, result.student.name, `รหัส: ${result.student.student_id} | ชั้น: ${result.student.class}`);
+    addScanLog(result.student, true);
+    // Play success sound
+    playBeep(true);
+  } catch (e) {
+    showScanResult(false, 'ไม่พบนักเรียนในระบบ', studentData.student_id || '');
+    playBeep(false);
+  }
+}
+
+function showScanResult(success, name, meta) {
+  const el = document.getElementById('scan-result');
+  el.className = `scan-result ${success ? 'success' : 'error'}`;
+  el.style.display = 'block';
+  document.getElementById('scan-icon').textContent = success ? '✅' : '❌';
+  document.getElementById('scan-name').textContent = name;
+  document.getElementById('scan-meta').textContent = meta;
+  setTimeout(() => { el.style.display = 'none'; }, 4000);
+}
+
+function addScanLog(student, success) {
+  const now = new Date();
+  const time = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`;
+  scanLog.unshift({ student, success, time });
+
+  const logEl = document.getElementById('scan-log');
+  logEl.innerHTML = scanLog.map(l => `
+    <div class="scan-log-item">
+      <span>${l.success ? '✅' : '❌'}</span>
+      <span style="flex:1;font-weight:600">${l.student.name}</span>
+      <span style="font-size:12px;color:var(--gray-500)">${l.student.student_id}</span>
+      <span class="scan-log-time">${l.time}</span>
+    </div>`).join('');
+}
+
+function clearLog() {
+  scanLog = [];
+  document.getElementById('scan-log').innerHTML = '<div style="text-align:center;padding:24px;color:var(--gray-400);font-size:13px">ยังไม่มีการสแกน</div>';
+}
+
+function playBeep(success) {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.value = success ? 880 : 220;
+    osc.type = 'sine';
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.3);
+  } catch(e) {}
+}
+
+// Init
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('scan-date').value = getTodayISO();
+  document.getElementById('scan-date').max   = getTodayISO();
+  loadAllQR();
+});
+</script>
+</body>
+</html>
