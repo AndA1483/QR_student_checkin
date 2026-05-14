@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: attendance-system
+    runtime: node
+    buildCommand: cd attendance-system && npm install
+    startCommand: cd attendance-system && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+    disk:
+      name: attendance-data
+      mountPath: /opt/render/project/src/attendance-system/data
+      sizeGB: 1
