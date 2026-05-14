@@ -504,7 +504,7 @@ function onClassChange() {
       // Show subject selector for admin
       loadSubjects().then(subjects => {
         document.getElementById('subject-pills').innerHTML = subjects.map(s =>
-          `<button class="subject-pill" style="color:${s.color};border-color:${s.color}" onclick="selectSubject(${s.id}, '${s.subject_name}', '${s.icon}', '${s.color}')">
+          `<button class="subject-pill" style="color:${s.color};border-color:${s.color}" onclick="selectSubjectAdmin(${s.id}, '${s.subject_name}', '${s.icon}', '${s.color}')">
             ${s.icon} ${s.subject_name}
           </button>`
         ).join('');
@@ -514,6 +514,16 @@ function onClassChange() {
       loadDateHistory();
     }
   }
+}
+
+function selectSubjectAdmin(subjectId, subjectName, icon, color) {
+  selectedSubjectId = subjectId;
+  
+  // Update active state
+  document.querySelectorAll('.subject-pill').forEach(btn => btn.classList.remove('active'));
+  event.target.classList.add('active');
+  
+  loadDateHistory();
 }
 
 function buildQueryString(extra = {}) {
@@ -607,12 +617,11 @@ async function loadDailyReport() {
     const s = data.summary;
 
     // Subject label
-    const sid = getSubjectId();
     const subLabelEl = document.getElementById('daily-subject-label');
     const subBadgeEl = document.getElementById('daily-subject-badge');
-    if (sid) {
+    if (selectedSubjectId) {
       const subjects = await loadSubjects();
-      const sub = subjects.find(x => String(x.id) === String(sid));
+      const sub = subjects.find(x => String(x.id) === String(selectedSubjectId));
       if (sub) {
         subBadgeEl.textContent = sub.icon + ' ' + sub.subject_name;
         subBadgeEl.style.cssText = 'padding:6px 16px;border-radius:20px;font-size:14px;font-weight:700;background:' + sub.color + '22;color:' + sub.color;
@@ -830,8 +839,8 @@ function safeFilename(str) {
 // ── Export รายงานรายวัน ────────────────────────────────────────────────────
 async function exportDailyExcel() {
   const date      = document.getElementById('report-date').value;
-  const classId   = getClassId();
-  const subjectId = getSubjectId();
+  const classId   = selectedClassId;
+  const subjectId = selectedSubjectId;
   if (!date) { showToast('กรุณาเลือกวันที่ก่อน', 'warning'); return; }
 
   try {
@@ -914,8 +923,8 @@ async function exportDailyExcel() {
 async function exportSemesterExcel() {
   if (!semesterData.length) { showToast('ไม่มีข้อมูลที่จะส่งออก', 'warning'); return; }
 
-  const classId   = getClassId();
-  const subjectId = getSubjectId();
+  const classId   = selectedClassId;
+  const subjectId = selectedSubjectId;
   const start = document.getElementById('sem-start').value;
   const end   = document.getElementById('sem-end').value;
 
