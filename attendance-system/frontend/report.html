@@ -213,7 +213,7 @@
           </div>
           <div class="card">
             <div class="card-header">
-              <span class="card-title">📋 รายละเอียดการเช็กชื่อ</span>
+              <span class="card-title" id="daily-report-title">📋 รายละเอียดการเช็กชื่อ</span>
               <div style="display:flex;align-items:center;gap:8px">
                 <span id="daily-detail-count" style="font-size:13px;color:var(--gray-500)"></span>
                 <button class="btn btn-outline btn-sm" onclick="exportDailyExcel()" id="export-daily-btn" style="display:none">📥 Excel</button>
@@ -265,7 +265,7 @@
 
         <div class="card">
           <div class="card-header">
-            <span class="card-title">📚 สรุปการเข้าเรียนทั้งเทอม</span>
+            <span class="card-title" id="semester-report-title">📚 สรุปการเข้าเรียนทั้งเทอม</span>
             <div style="display:flex;align-items:center;gap:8px">
               <span id="sem-count" style="font-size:13px;color:var(--gray-500)"></span>
               <button class="btn btn-outline btn-sm" onclick="exportSemesterExcel()" id="export-sem-btn" style="display:none">📥 Excel</button>
@@ -631,6 +631,18 @@ async function loadDailyReport() {
       subLabelEl.style.display = 'none';
     }
 
+    // Update report title based on mode
+    const titleEl = document.getElementById('daily-report-title');
+    if (reportMode === 'homeroom') {
+      titleEl.textContent = '📋 รายละเอียดการเช็กชื่อ (ประจำชั้น)';
+    } else if (reportMode === 'subject' && selectedSubjectId) {
+      const subjects = await loadSubjects();
+      const sub = subjects.find(x => String(x.id) === String(selectedSubjectId));
+      titleEl.textContent = '📋 รายละเอียดการเช็กชื่อ (รายวิชา: ' + (sub ? sub.subject_name : '') + ')';
+    } else {
+      titleEl.textContent = '📋 รายละเอียดการเช็กชื่อ';
+    }
+
     document.getElementById('daily-stats').innerHTML =
       '<div class="stat-card"><div class="stat-icon blue">👨‍🎓</div><div class="stat-info"><div class="stat-value">' + s.total + '</div><div class="stat-label">นักเรียนทั้งหมด</div></div></div>' +
       '<div class="stat-card"><div class="stat-icon green">✅</div><div class="stat-info"><div class="stat-value">' + (s.present||0) + '</div><div class="stat-label">มาเรียน</div></div></div>' +
@@ -696,6 +708,19 @@ async function loadSemesterReport(all = false) {
     if (start && end) { extra.start = start; extra.end = end; }
     semesterData = await apiFetch('/attendance/report/semester' + buildQueryString(extra));
     renderSemesterTable(semesterData);
+    
+    // Update semester report title based on mode
+    const semTitleEl = document.getElementById('semester-report-title');
+    if (reportMode === 'homeroom') {
+      semTitleEl.textContent = '📚 สรุปการเข้าเรียนทั้งเทอม (ประจำชั้น)';
+    } else if (reportMode === 'subject' && selectedSubjectId) {
+      const subjects = await loadSubjects();
+      const sub = subjects.find(x => String(x.id) === String(selectedSubjectId));
+      semTitleEl.textContent = '📚 สรุปการเข้าเรียนทั้งเทอม (รายวิชา: ' + (sub ? sub.subject_name : '') + ')';
+    } else {
+      semTitleEl.textContent = '📚 สรุปการเข้าเรียนทั้งเทอม';
+    }
+    
     const tp = semesterData.reduce((a,r) => a+(r.present||0), 0);
     const ta = semesterData.reduce((a,r) => a+(r.absent||0), 0);
     const tl = semesterData.reduce((a,r) => a+(r.leave||0), 0);
@@ -857,9 +882,20 @@ async function exportDailyExcel() {
     const aoa = [];
 
     // แถวหัวข้อ
-    aoa.push(['รายงานการเข้าเรียนรายวัน']);
-    aoa.push(['วันที่', formatThaiDate(date), '', 'ชั้นเรียน', className]);
-    if (subjectName) aoa.push(['วิชา', subjectName]);
+    if (reportMode === 'homeroom') {
+      aoa.push(['รายงานการเข้าเรียนรายวัน (ประจำชั้น)']);
+      aoa.push(['วันที่', formatThaiDate(date), '', 'ชั้นเรียน', className]);
+      aoa.push(['ประเภท', 'ประจำชั้น']);
+    } else if (reportMode === 'subject') {
+      aoa.push(['รายงานการเข้าเรียนรายวัน (รายวิชา)']);
+      aoa.push(['วันที่', formatThaiDate(date), '', 'ชั้นเรียน', className]);
+      if (subjectName) aoa.push(['วิชา', subjectName]);
+      aoa.push(['ประเภท', 'รายวิชา']);
+    } else {
+      aoa.push(['รายงานการเข้าเรียนรายวัน']);
+      aoa.push(['วันที่', formatThaiDate(date), '', 'ชั้นเรียน', className]);
+      if (subjectName) aoa.push(['วิชา', subjectName]);
+    }
     aoa.push([]); // เว้นบรรทัด
 
     // แถวสรุปสถิติ
@@ -911,8 +947,18 @@ async function exportDailyExcel() {
     const titleCell = XLSX.utils.encode_cell({ r: 0, c: 0 });
     if (ws[titleCell]) ws[titleCell].s = { font: { bold: true, sz: 14 } };
 
+    // สร้างชื่อไฟล์
+    let filename = 'รายงานรายวัน';
+    if (reportMode === 'homeroom') {
+      filename = `ประจำชั้น_${className}_${date}.xlsx`;
+    } else if (reportMode === 'subject' && subjectName) {
+      filename = `รายวิชา_${safeFilename(subjectName)}_${className}_${date}.xlsx`;
+    } else {
+      filename = `รายงานรายวัน_${className}_${date}.xlsx`;
+    }
+
     XLSX.utils.book_append_sheet(wb, ws, 'รายงานรายวัน');
-    downloadXlsx(wb, `รายงานรายวัน_${className}_${date}.xlsx`);
+    downloadXlsx(wb, filename);
     showToast('ส่งออก Excel เรียบร้อย', 'success');
   } catch (e) {
     showToast('ส่งออกไม่สำเร็จ: ' + e.message, 'error');
@@ -944,9 +990,20 @@ async function exportSemesterExcel() {
     const aoa = [];
 
     // หัวข้อ
-    aoa.push(['รายงานสรุปการเข้าเรียนทั้งเทอม']);
-    aoa.push(['ชั้นเรียน', className, '', 'จำนวนนักเรียน', semesterData.length + ' คน']);
-    if (subjectName) aoa.push(['วิชา', subjectName]);
+    if (reportMode === 'homeroom') {
+      aoa.push(['รายงานสรุปการเข้าเรียนทั้งเทอม (ประจำชั้น)']);
+      aoa.push(['ชั้นเรียน', className, '', 'จำนวนนักเรียน', semesterData.length + ' คน']);
+      aoa.push(['ประเภท', 'ประจำชั้น']);
+    } else if (reportMode === 'subject') {
+      aoa.push(['รายงานสรุปการเข้าเรียนทั้งเทอม (รายวิชา)']);
+      aoa.push(['ชั้นเรียน', className, '', 'จำนวนนักเรียน', semesterData.length + ' คน']);
+      if (subjectName) aoa.push(['วิชา', subjectName]);
+      aoa.push(['ประเภท', 'รายวิชา']);
+    } else {
+      aoa.push(['รายงานสรุปการเข้าเรียนทั้งเทอม']);
+      aoa.push(['ชั้นเรียน', className, '', 'จำนวนนักเรียน', semesterData.length + ' คน']);
+      if (subjectName) aoa.push(['วิชา', subjectName]);
+    }
     if (start && end) aoa.push(['ช่วงเวลา', `${formatThaiDate(start)} – ${formatThaiDate(end)}`]);
     aoa.push([]); // เว้นบรรทัด
 
@@ -999,10 +1056,21 @@ async function exportSemesterExcel() {
     const titleCell = XLSX.utils.encode_cell({ r: 0, c: 0 });
     if (ws[titleCell]) ws[titleCell].s = { font: { bold: true, sz: 14 } };
 
+    // สร้างชื่อไฟล์
     const classPart = safeFilename(className);
     const datePart  = start && end ? `_${start}_${end}` : '';
+    let filename = '';
+    
+    if (reportMode === 'homeroom') {
+      filename = `ประจำชั้น_สรุปเทอม_${classPart}${datePart}.xlsx`;
+    } else if (reportMode === 'subject' && subjectName) {
+      filename = `รายวิชา_${safeFilename(subjectName)}_${classPart}${datePart}.xlsx`;
+    } else {
+      filename = `สรุปทั้งเทอม_${classPart}${datePart}.xlsx`;
+    }
+    
     XLSX.utils.book_append_sheet(wb, ws, 'สรุปทั้งเทอม');
-    downloadXlsx(wb, `สรุปทั้งเทอม_${classPart}${datePart}.xlsx`);
+    downloadXlsx(wb, filename);
     showToast('ส่งออก Excel เรียบร้อย', 'success');
   } catch (e) {
     showToast('ส่งออกไม่สำเร็จ: ' + e.message, 'error');
