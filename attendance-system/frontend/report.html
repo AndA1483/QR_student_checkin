@@ -24,6 +24,42 @@
   <!-- SheetJS สำหรับ export Excel -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
+    .context-bar {
+      background:white;border:1px solid var(--gray-200);border-radius:var(--radius);
+      padding:16px 24px;display:flex;align-items:center;gap:14px;
+      margin-bottom:14px;flex-wrap:wrap;box-shadow:var(--shadow);
+    }
+    .context-bar label{font-weight:700;font-size:15px;color:var(--gray-700);white-space:nowrap;display:flex;align-items:center;gap:6px;}
+    .context-select{
+      padding:10px 36px 10px 14px;border:1px solid var(--gray-300);border-radius:10px;
+      font-size:15px;font-family:inherit;color:var(--gray-800);background:white;font-weight:600;
+      appearance:none;outline:none;cursor:pointer;min-width:220px;
+      background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 12 12'%3E%3Cpath fill='%236b7280' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+      background-repeat:no-repeat;background-position:right 12px center;transition:all .2s;
+    }
+    .context-select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(79,70,229,.1);}
+    .context-select:hover{border-color:var(--primary);}
+    .class-card-btn {
+      display:flex;flex-direction:column;align-items:center;gap:6px;
+      padding:14px 20px;background:white;border:2px solid var(--gray-200);
+      border-radius:12px;cursor:pointer;transition:all .2s;font-family:inherit;
+      min-width:100px;text-align:center;
+    }
+    .class-card-btn:hover { border-color:var(--primary);box-shadow:0 4px 12px rgba(79,70,229,.15);transform:translateY(-2px); }
+    .class-card-btn.active { border-color:var(--primary);background:var(--primary-light);color:var(--primary); }
+    .class-card-btn.homeroom { border-color:#3b82f6; }
+    .class-card-btn.homeroom.active { background:#dbeafe;color:#1d4ed8;border-color:#1d4ed8; }
+    .class-card-code { font-size:18px;font-weight:800; }
+    .class-card-tags { font-size:11px;color:var(--gray-500);line-height:1.3; }
+    .class-card-btn.active .class-card-tags { color:var(--primary); }
+    .subject-pills { display:flex;gap:8px;flex-wrap:wrap; }
+    .subject-pill {
+      padding:8px 16px;border-radius:20px;border:2px solid;cursor:pointer;
+      font-size:14px;font-weight:700;transition:all .2s;font-family:inherit;
+      background:white;
+    }
+    .subject-pill:hover { transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,.1); }
+    .subject-pill.active { background:currentColor;color:white !important; }
     .filter-row { display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px; }
     .filter-row label { font-size:13px;font-weight:700;color:var(--gray-600);white-space:nowrap; }
     .filter-select {
@@ -107,39 +143,43 @@
 
     <main class="page-content">
 
-      <!-- ── Context Filter Bar ── -->
-      <div class="filter-row" id="context-filter-bar">
+      <!-- ── Report Type Selector ── -->
+      <div class="context-bar">
         <label>📊 ประเภทรายงาน:</label>
-        <select class="filter-select" id="report-type-filter" onchange="onReportTypeChange()" style="min-width:180px;font-weight:700">
-          <option value="all">📚 ทุกชั้นเรียน</option>
-          <option value="class">🏛️ ชั้นเรียน</option>
-          <option value="subject">📖 วิชา</option>
+        <select class="context-select" id="report-type-filter" onchange="onReportTypeChange()">
           <option value="homeroom">🏠 ประจำชั้น</option>
+          <option value="subject">📚 รายวิชา</option>
         </select>
-        
-        <div id="class-filter-group" style="display:none;align-items:center;gap:10px">
-          <label>🏛️ เลือกชั้น:</label>
-          <select class="filter-select" id="class-filter" onchange="onContextChange()">
-            <option value="">— เลือกชั้นเรียน —</option>
-          </select>
-        </div>
-        
-        <div id="subject-filter-group" style="display:none;align-items:center;gap:10px">
-          <label>📖 เลือกวิชา:</label>
-          <select class="filter-select" id="subject-filter" onchange="onContextChange()">
-            <option value="">— เลือกวิชา —</option>
-          </select>
-        </div>
-        
-        <div id="homeroom-filter-group" style="display:none;align-items:center;gap:10px">
-          <label>🏠 เลือกชั้น:</label>
-          <select class="filter-select" id="homeroom-class-filter" onchange="onContextChange()">
-            <option value="">— เลือกชั้นประจำ —</option>
-          </select>
-        </div>
-        
-        <span id="context-badge"></span>
       </div>
+
+      <!-- My Classes Panel (for homeroom) -->
+      <div id="my-classes-panel" style="display:none;margin-bottom:14px">
+        <div style="font-size:13px;font-weight:700;color:var(--gray-600);margin-bottom:10px" id="my-classes-label">🏠 ชั้นเรียนประจำชั้นของฉัน</div>
+        <div id="my-classes-grid" style="display:flex;gap:10px;flex-wrap:wrap"></div>
+      </div>
+
+      <!-- Admin Class Bar (for admin selecting any class) -->
+      <div class="context-bar" id="admin-class-bar" style="display:none">
+        <label>🏛️ ชั้นเรียน:</label>
+        <select class="context-select" id="class-filter" onchange="onClassChange()">
+          <option value="">— เลือกชั้นเรียน —</option>
+        </select>
+        <span id="class-badge"></span>
+      </div>
+
+      <!-- Selected Class Bar (shows selected class info) -->
+      <div class="context-bar" id="selected-class-bar" style="display:none">
+        <span id="selected-class-info" style="font-size:15px;font-weight:800;color:var(--primary)"></span>
+        <span id="selected-class-tags" style="font-size:13px;color:var(--gray-500)"></span>
+      </div>
+
+      <!-- Subject Bar (for subject mode) -->
+      <div class="context-bar" id="subject-bar" style="display:none">
+        <label>📚 เลือกวิชา:</label>
+        <div class="subject-pills" id="subject-pills" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+      </div>
+
+      <span id="context-badge" style="display:none"></span>
 
       <!-- ── Tabs ── -->
       <div class="tab-bar">
@@ -150,10 +190,10 @@
 
       <!-- ══ Daily Tab ══ -->
       <div class="tab-content active" id="tab-daily">
-        <div class="filter-row">
+        <div class="context-bar">
           <label>📅 วันที่:</label>
-          <input type="date" id="report-date" class="search-input" style="min-width:160px">
-          <button class="btn btn-primary btn-sm" onclick="loadDailyReport()">🔍 ดูรายงาน</button>
+          <input type="date" id="report-date" class="context-select" style="min-width:180px;padding:10px 14px">
+          <button class="btn btn-primary" onclick="loadDailyReport()">🔍 ดูรายงาน</button>
         </div>
 
         <div id="daily-loading" class="loading" style="display:none"><div class="spinner"></div> กำลังโหลด...</div>
@@ -306,6 +346,9 @@
 let dailyChart;
 let semesterData = [];
 let mySubjects = []; // teacher's subjects (empty for admin = use all)
+let selectedClassId = null;
+let selectedSubjectId = null;
+let reportMode = 'homeroom'; // 'homeroom' or 'subject'
 
 // ── Init ───────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
@@ -324,84 +367,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     return;
   }
 
-  // Build class selector
+  // Initialize based on role
   if (currentUser.role === 'admin') {
+    // Admin: populate all classes
     await populateClassSelect('class-filter', 'เลือกชั้นเรียน');
-    await populateClassSelect('homeroom-class-filter', 'เลือกชั้นประจำ');
-    await populateSubjectSelect('subject-filter', 'เลือกวิชา');
     // Show manage tab
     document.querySelectorAll('.admin-only').forEach(el => el.style.display = '');
   } else {
-    // Teacher: populate their classes
-    const myClasses = new Map();
-    (currentUser.homerooms || []).forEach(h => myClasses.set(h.class_id, h));
-    (currentUser.subjects  || []).forEach(s => myClasses.set(s.class_id, s));
-    
-    // Populate class filter
-    const sel = document.getElementById('class-filter');
-    sel.innerHTML = '<option value="">— เลือกชั้นเรียน —</option>';
-    const byGrade = {};
-    myClasses.forEach(c => { if (!byGrade[c.grade]) byGrade[c.grade] = []; byGrade[c.grade].push(c); });
-    Object.entries(byGrade).sort().forEach(([grade, list]) => {
-      const grp = document.createElement('optgroup');
-      grp.label = grade;
-      list.sort((a,b) => Number(a.room)-Number(b.room)).forEach(c => {
-        const opt = document.createElement('option');
-        opt.value = c.class_id;
-        opt.textContent = c.class_code;
-        grp.appendChild(opt);
-      });
-      sel.appendChild(grp);
-    });
-
-    // Populate homeroom filter (only homeroom classes)
-    const homeroomSel = document.getElementById('homeroom-class-filter');
-    homeroomSel.innerHTML = '<option value="">— เลือกชั้นประจำ —</option>';
-    const homerooms = currentUser.homerooms || [];
-    const homeroomByGrade = {};
-    homerooms.forEach(h => { if (!homeroomByGrade[h.grade]) homeroomByGrade[h.grade] = []; homeroomByGrade[h.grade].push(h); });
-    Object.entries(homeroomByGrade).sort().forEach(([grade, list]) => {
-      const grp = document.createElement('optgroup');
-      grp.label = grade;
-      list.sort((a,b) => Number(a.room)-Number(b.room)).forEach(h => {
-        const opt = document.createElement('option');
-        opt.value = h.class_id;
-        opt.textContent = h.class_code;
-        grp.appendChild(opt);
-      });
-      homeroomSel.appendChild(grp);
-    });
-
-    // Teacher: only their subjects
+    // Teacher: get their assignments
     mySubjects = currentUser.subjects || [];
-    const seen = new Set();
-    const uniqueSubjects = mySubjects.filter(s => {
-      if (seen.has(s.subject_id)) return false; seen.add(s.subject_id); return true;
-    });
-    const subSel = document.getElementById('subject-filter');
-    subSel.innerHTML = '<option value="">— เลือกวิชา —</option>';
-    uniqueSubjects.forEach(s => {
-      const opt = document.createElement('option');
-      opt.value = s.subject_id;
-      opt.textContent = s.icon + ' ' + s.subject_name;
-      subSel.appendChild(opt);
-    });
   }
 
-  // URL params
-  const params = new URLSearchParams(window.location.search);
-  if (params.get('class_id')) {
-    document.getElementById('report-type-filter').value = 'class';
-    document.getElementById('class-filter').value = params.get('class_id');
-    onReportTypeChange();
-  }
-  if (params.get('subject_id')) {
-    document.getElementById('report-type-filter').value = 'subject';
-    document.getElementById('subject-filter').value = params.get('subject_id');
-    onReportTypeChange();
-  }
+  // Set initial mode
+  reportMode = 'homeroom';
+  document.getElementById('report-type-filter').value = 'homeroom';
+  onReportTypeChange();
 
-  updateContextBadge();
   loadDateHistory();
 
   document.getElementById('sem-search')?.addEventListener('input', function() {
@@ -411,50 +392,141 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 // ── Context helpers ────────────────────────────────────────────────────────
-function getReportType()  { return document.getElementById('report-type-filter')?.value || 'all'; }
-function getClassId()     { return document.getElementById('class-filter')?.value || ''; }
-function getSubjectId()   { return document.getElementById('subject-filter')?.value || ''; }
-function getHomeroomClassId() { return document.getElementById('homeroom-class-filter')?.value || ''; }
+function getReportType()  { return document.getElementById('report-type-filter')?.value || 'homeroom'; }
 
-function onReportTypeChange() {
-  const type = getReportType();
+async function onReportTypeChange() {
+  reportMode = getReportType();
+  selectedClassId = null;
+  selectedSubjectId = null;
   
-  // Hide all filter groups
-  document.getElementById('class-filter-group').style.display = 'none';
-  document.getElementById('subject-filter-group').style.display = 'none';
-  document.getElementById('homeroom-filter-group').style.display = 'none';
+  // Hide all panels
+  document.getElementById('my-classes-panel').style.display = 'none';
+  document.getElementById('admin-class-bar').style.display = 'none';
+  document.getElementById('selected-class-bar').style.display = 'none';
+  document.getElementById('subject-bar').style.display = 'none';
   
-  // Show relevant filter group
-  if (type === 'class') {
-    document.getElementById('class-filter-group').style.display = 'flex';
-  } else if (type === 'subject') {
-    document.getElementById('subject-filter-group').style.display = 'flex';
-  } else if (type === 'homeroom') {
-    document.getElementById('homeroom-filter-group').style.display = 'flex';
+  if (reportMode === 'homeroom') {
+    // Homeroom mode
+    if (currentUser.role === 'admin') {
+      // Admin: show class selector
+      document.getElementById('admin-class-bar').style.display = 'flex';
+      await populateClassSelect('class-filter', 'เลือกชั้นเรียน');
+    } else {
+      // Teacher: show their homeroom classes as cards
+      const homerooms = currentUser.homerooms || [];
+      if (homerooms.length > 0) {
+        document.getElementById('my-classes-label').textContent = '🏠 ชั้นเรียนประจำชั้นของฉัน';
+        document.getElementById('my-classes-grid').innerHTML = homerooms.map(h => 
+          `<button class="class-card-btn homeroom" onclick="selectClass(${h.class_id}, '${h.class_code}', '${h.class_name}', '${h.grade}', '${h.room}')">
+            <div class="class-card-code">${h.class_code}</div>
+            <div class="class-card-tags">${h.class_name}</div>
+          </button>`
+        ).join('');
+        document.getElementById('my-classes-panel').style.display = 'block';
+      }
+    }
+  } else if (reportMode === 'subject') {
+    // Subject mode
+    if (currentUser.role === 'admin') {
+      // Admin: show class selector + subject selector
+      document.getElementById('admin-class-bar').style.display = 'flex';
+      await populateClassSelect('class-filter', 'เลือกชั้นเรียน');
+    } else {
+      // Teacher: show their classes as cards
+      const myClasses = new Map();
+      (currentUser.subjects || []).forEach(s => myClasses.set(s.class_id, s));
+      if (myClasses.size > 0) {
+        document.getElementById('my-classes-label').textContent = '🏛️ ชั้นเรียนที่สอน';
+        document.getElementById('my-classes-grid').innerHTML = Array.from(myClasses.values()).map(c => 
+          `<button class="class-card-btn" onclick="selectClass(${c.class_id}, '${c.class_code}', '${c.class_name}', '${c.grade}', '${c.room}')">
+            <div class="class-card-code">${c.class_code}</div>
+            <div class="class-card-tags">${c.class_name}</div>
+          </button>`
+        ).join('');
+        document.getElementById('my-classes-panel').style.display = 'block';
+      }
+    }
   }
   
-  updateContextBadge();
   loadDateHistory();
   document.getElementById('daily-content').style.display = 'none';
   document.getElementById('date-history-card').style.display = 'block';
 }
 
+function selectClass(classId, classCode, className, grade, room) {
+  selectedClassId = classId;
+  selectedSubjectId = null;
+  
+  // Update active state
+  document.querySelectorAll('.class-card-btn').forEach(btn => btn.classList.remove('active'));
+  event.target.closest('.class-card-btn').classList.add('active');
+  
+  // Hide class panel, show selected bar
+  document.getElementById('my-classes-panel').style.display = 'none';
+  document.getElementById('selected-class-bar').style.display = 'flex';
+  document.getElementById('selected-class-info').textContent = `🏛️ ${classCode}`;
+  document.getElementById('selected-class-tags').textContent = className;
+  
+  // If subject mode, show subject pills
+  if (reportMode === 'subject') {
+    const classSubjects = (currentUser.subjects || []).filter(s => s.class_id === classId);
+    if (classSubjects.length > 0) {
+      document.getElementById('subject-pills').innerHTML = classSubjects.map(s =>
+        `<button class="subject-pill" style="color:${s.color};border-color:${s.color}" onclick="selectSubject(${s.subject_id}, '${s.subject_name}', '${s.icon}', '${s.color}')">
+          ${s.icon} ${s.subject_name}
+        </button>`
+      ).join('');
+      document.getElementById('subject-bar').style.display = 'flex';
+    }
+  } else {
+    // Homeroom mode: load immediately
+    loadDateHistory();
+  }
+}
+
+function selectSubject(subjectId, subjectName, icon, color) {
+  selectedSubjectId = subjectId;
+  
+  // Update active state
+  document.querySelectorAll('.subject-pill').forEach(btn => btn.classList.remove('active'));
+  event.target.classList.add('active');
+  
+  loadDateHistory();
+}
+
+function onClassChange() {
+  const classId = document.getElementById('class-filter').value;
+  if (classId) {
+    selectedClassId = classId;
+    selectedSubjectId = null;
+    
+    if (reportMode === 'subject') {
+      // Show subject selector for admin
+      loadSubjects().then(subjects => {
+        document.getElementById('subject-pills').innerHTML = subjects.map(s =>
+          `<button class="subject-pill" style="color:${s.color};border-color:${s.color}" onclick="selectSubject(${s.id}, '${s.subject_name}', '${s.icon}', '${s.color}')">
+            ${s.icon} ${s.subject_name}
+          </button>`
+        ).join('');
+        document.getElementById('subject-bar').style.display = 'flex';
+      });
+    } else {
+      loadDateHistory();
+    }
+  }
+}
+
 function buildQueryString(extra = {}) {
   const p = new URLSearchParams();
-  const type = getReportType();
   
-  if (type === 'class') {
-    const cid = getClassId();
-    if (cid) p.set('class_id', cid);
-  } else if (type === 'subject') {
-    const sid = getSubjectId();
-    if (sid) p.set('subject_id', sid);
-  } else if (type === 'homeroom') {
-    const hcid = getHomeroomClassId();
-    if (hcid) {
-      p.set('class_id', hcid);
-      p.set('homeroom_only', 'true');
-    }
+  if (selectedClassId) {
+    p.set('class_id', selectedClassId);
+  }
+  if (selectedSubjectId) {
+    p.set('subject_id', selectedSubjectId);
+  }
+  if (reportMode === 'homeroom' && selectedClassId) {
+    p.set('homeroom_only', 'true');
   }
   
   Object.entries(extra).forEach(([k,v]) => { if (v) p.set(k, v); });
@@ -463,71 +535,16 @@ function buildQueryString(extra = {}) {
 }
 
 async function updateContextBadge() {
-  const badge = document.getElementById('context-badge');
-  const type = getReportType();
-  let parts = [];
-  
-  if (type === 'class') {
-    const cid = getClassId();
-    if (cid) {
-      const classes = await loadClasses();
-      const cls = classes.find(c => String(c.id) === String(cid));
-      if (cls) parts.push('<span style="padding:6px 16px;border-radius:20px;font-size:14px;font-weight:700;background:#dbeafe;color:#1d4ed8;border:2px solid #3b82f6">🏛️ ' + cls.class_code + '</span>');
-    }
-  } else if (type === 'subject') {
-    const sid = getSubjectId();
-    if (sid) {
-      const subjects = await loadSubjects();
-      const sub = subjects.find(s => String(s.id) === String(sid));
-      if (sub) parts.push('<span style="padding:6px 16px;border-radius:20px;font-size:14px;font-weight:700;background:' + sub.color + '22;color:' + sub.color + ';border:2px solid ' + sub.color + '">' + sub.icon + ' ' + sub.subject_name + '</span>');
-    }
-  } else if (type === 'homeroom') {
-    const hcid = getHomeroomClassId();
-    if (hcid) {
-      const classes = await loadClasses();
-      const cls = classes.find(c => String(c.id) === String(hcid));
-      if (cls) parts.push('<span style="padding:6px 16px;border-radius:20px;font-size:14px;font-weight:700;background:#fef3c7;color:#d97706;border:2px solid #f59e0b">🏠 ประจำชั้น ' + cls.class_code + '</span>');
-    }
-  }
-  
-  badge.innerHTML = parts.join(' ');
-
-  // Update subtitle
+  // Badge is now shown in selected-class-bar
   const sub = document.getElementById('report-subtitle');
-  if (type === 'subject') {
-    const sid = getSubjectId();
-    if (sid) {
-      const subjects = await loadSubjects();
-      const s = subjects.find(x => String(x.id) === String(sid));
-      sub.textContent = s ? 'รายงาน ' + s.subject_name : 'รายงานการเข้าเรียน';
-    } else {
-      sub.textContent = 'รายงานตามวิชา';
-    }
-  } else if (type === 'homeroom') {
-    const hcid = getHomeroomClassId();
-    if (hcid) {
-      const classes = await loadClasses();
-      const cls = classes.find(c => String(c.id) === String(hcid));
-      sub.textContent = cls ? 'รายงานประจำชั้น ' + cls.class_code : 'รายงานประจำชั้น';
-    } else {
-      sub.textContent = 'รายงานประจำชั้น';
-    }
-  } else if (type === 'class') {
-    const cid = getClassId();
-    if (cid) {
-      const classes = await loadClasses();
-      const cls = classes.find(c => String(c.id) === String(cid));
-      sub.textContent = cls ? 'รายงาน ' + cls.class_code : 'รายงานตามชั้นเรียน';
-    } else {
-      sub.textContent = 'รายงานตามชั้นเรียน';
-    }
+  if (reportMode === 'homeroom') {
+    sub.textContent = 'รายงานประจำชั้น';
   } else {
-    sub.textContent = 'รายงานการเข้าเรียน';
+    sub.textContent = 'รายงานรายวิชา';
   }
 }
 
 function onContextChange() {
-  updateContextBadge();
   loadDateHistory();
   document.getElementById('daily-content').style.display = 'none';
   document.getElementById('date-history-card').style.display = 'block';
