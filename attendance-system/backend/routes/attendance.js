@@ -15,21 +15,25 @@ function buildFilters({ class_id, subject_id }) {
 
 /**
  * For a teacher (non-admin), restrict queries to only the classes/subjects
- * they are assigned to. Returns { classIds, subjectIds } or null for admin.
+ * they are assigned to. Returns { classIds, subjectIds, homeroomClassIds, subjectClassIds } or null for admin.
  */
 function getTeacherScope(req) {
   if (req.session.role === 'admin') return null; // admin sees everything
   const uid = req.session.userId;
 
-  const assignments = queryAll(`
-    SELECT ts.class_id, ts.subject_id FROM teacher_subjects ts WHERE ts.user_id = ?
-    UNION
-    SELECT th.class_id, NULL as subject_id FROM teacher_homeroom th WHERE th.user_id = ?
-  `, [uid, uid]);
+  // Get homeroom classes
+  const homeroomRows = queryAll(`SELECT class_id FROM teacher_homeroom WHERE user_id = ?`, [uid]);
+  const homeroomClassIds = homeroomRows.map(r => r.class_id);
 
-  const classIds   = [...new Set(assignments.map(a => a.class_id))];
-  const subjectIds = [...new Set(assignments.filter(a => a.subject_id).map(a => a.subject_id))];
-  return { classIds, subjectIds, uid };
+  // Get subject classes
+  const subjectRows = queryAll(`SELECT class_id, subject_id FROM teacher_subjects WHERE user_id = ?`, [uid]);
+  const subjectClassIds = [...new Set(subjectRows.map(r => r.class_id))];
+  const subjectIds = [...new Set(subjectRows.map(r => r.subject_id))];
+
+  // All classes (homeroom + subject)
+  const classIds = [...new Set([...homeroomClassIds, ...subjectClassIds])];
+
+  return { classIds, subjectIds, homeroomClassIds, subjectClassIds, uid };
 }
 
 /** Build IN clause for teacher's allowed class_ids */
@@ -271,14 +275,36 @@ router.get('/report/semester', (req, res) => {
 });
 
 // ── GET dates with attendance ──────────────────────────────────────────────
-// ?class_id= ?subject_id=
+// ?class_id= ?subject_id= ?homeroom_filter=
 router.get('/dates', (req, res) => {
-  const { class_id, subject_id } = req.query;
+  const { class_id, subject_id, homeroom_filter } = req.query;
   const scope = getTeacherScope(req);
 
   let classFilter = '';
   let classParams = [];
-  if (class_id) {
+  
+  // Handle homeroom_filter
+  if (homeroom_filter === 'homeroom') {
+    // Only homeroom classes
+    if (scope && scope.homeroomClassIds && scope.homeroomClassIds.length > 0) {
+      classFilter = `AND s.class_id IN (${scope.homeroomClassIds.map(() => '?').join(',')})`;
+      classParams = scope.homeroomClassIds;
+    } else {
+      // No homeroom classes - return empty
+      res.json([]);
+      return;
+    }
+  } else if (homeroom_filter === 'subject') {
+    // Only subject classes (not homeroom)
+    if (scope && scope.subjectClassIds && scope.subjectClassIds.length > 0) {
+      classFilter = `AND s.class_id IN (${scope.subjectClassIds.map(() => '?').join(',')})`;
+      classParams = scope.subjectClassIds;
+    } else {
+      // No subject classes - return empty
+      res.json([]);
+      return;
+    }
+  } else if (class_id) {
     classFilter = 'AND s.class_id = ?';
     classParams = [class_id];
   } else if (scope) {
