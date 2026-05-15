@@ -398,13 +398,24 @@ function studentCardHtml(s) {
   const statusStyle = statusColors[st] || 'background:var(--gray-100);color:var(--gray-600)';
   const statusBadge = `<span style="display:inline-block;font-size:11px;padding:2px 8px;border-radius:10px;font-weight:700;white-space:nowrap;${statusStyle}">${st}</span>`;
 
-  // วันเกิด
+  // วันเกิดและอายุ
   let birthdateHtml = '';
   if (s.birthdate) {
     const bd = new Date(s.birthdate);
-    const age = Math.floor((Date.now() - bd) / (365.25 * 24 * 3600 * 1000));
-    const thDate = bd.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: 'numeric' });
-    birthdateHtml = `<span>🎂 ${thDate} (${age} ปี)</span>`;
+    if (!isNaN(bd.getTime())) {
+      const today = new Date();
+      let age = today.getFullYear() - bd.getFullYear();
+      const monthDiff = today.getMonth() - bd.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < bd.getDate())) {
+        age--;
+      }
+      const thDate = bd.toLocaleDateString('th-TH', { 
+        day: 'numeric', 
+        month: 'short', 
+        year: 'numeric' 
+      });
+      birthdateHtml = `<span>🎂 ${thDate} (${age} ปี)</span>`;
+    }
   }
 
   const actions = isAdmin
@@ -427,6 +438,7 @@ function studentCardHtml(s) {
       </div>
       <div class="s-meta">เลขที่ ${s.number} | รหัส: ${s.student_id}${s.national_id ? ` | บัตรปชช: ${s.national_id}` : ''}</div>
       <div class="s-meta">ชั้น: ${s.class}${birthdateHtml ? ' | ' + birthdateHtml.replace(/<[^>]+>/g,'') : ''}</div>
+      ${s.student_status !== 'กำลังศึกษา' ? `<div class="s-meta">สถานะ: ${statusBadge}</div>` : ''}
     </div>
     ${actions}
   </div>`;
@@ -787,15 +799,79 @@ function findCol(headers, aliases) {
 // helper: แปลงวันที่ไทย/สากล → YYYY-MM-DD
 function parseDateTH(str) {
   if (!str) return null;
-  // รูปแบบ YYYY-MM-DD หรือ DD/MM/YYYY หรือ DD/MM/BBBB (พ.ศ.)
+  
+  // รูปแบบ YYYY-MM-DD อยู่แล้ว
   if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
-  const m = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
-  if (m) {
-    let [, d, mo, y] = m;
-    if (parseInt(y) > 2400) y = String(parseInt(y) - 543); // พ.ศ. → ค.ศ.
-    return `${y}-${mo.padStart(2,'0')}-${d.padStart(2,'0')}`;
+  
+  // รองรับรูปแบบต่างๆ: DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY
+  const patterns = [
+    /^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})$/,  // dd/mm/yyyy
+    /^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2})$/,   // dd/mm/yy
+    /^(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})$/,   // yyyy/mm/dd
+  ];
+  
+  for (const pattern of patterns) {
+    const match = str.match(pattern);
+    if (match) {
+      let [, part1, part2, part3] = match;
+      let day, month, year;
+      
+      if (part3.length === 4) {
+        // dd/mm/yyyy หรือ yyyy/mm/dd
+        if (parseInt(part1) > 31) {
+          // yyyy/mm/dd
+          year = parseInt(part1);
+          month = parseInt(part2);
+          day = parseInt(part3);
+        } else {
+          // dd/mm/yyyy
+          day = parseInt(part1);
+          month = parseInt(part2);
+          year = parseInt(part3);
+        }
+      } else {
+        // dd/mm/yy
+        day = parseInt(part1);
+        month = parseInt(part2);
+        year = parseInt(part3);
+        // แปลง yy เป็น yyyy
+        year = year < 50 ? 2000 + year : 1900 + year;
+      }
+      
+      // แปลงปี พ.ศ. เป็น ค.ศ. (ถ้าเป็นปี พ.ศ.)
+      if (year > 2500) {
+        year -= 543;
+      }
+      
+      // ตรวจสอบความถูกต้องของวันที่
+      if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+        const date = new Date(year, month - 1, day);
+        if (date.getFullYear() === year && 
+            date.getMonth() === month - 1 && 
+            date.getDate() === day) {
+          return `${year}-${month.toString().padStart(2,'0')}-${day.toString().padStart(2,'0')}`;
+        }
+      }
+    }
   }
+  
   return null;
+}
+
+// แสดงวันที่ในรูปแบบภาษาไทย
+function formatDateTH(dateStr) {
+  if (!dateStr) return '—';
+  try {
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return '—';
+    return date.toLocaleDateString('th-TH', { 
+      day: 'numeric', 
+      month: 'short', 
+      year: 'numeric' 
+    });
+  } catch (e) {
+    return '—';
+  }
 }
 
 function showImportPreview(rows, errors) {
@@ -822,7 +898,7 @@ function showImportPreview(rows, errors) {
       <td style="font-size:12px;color:var(--gray-500)">${r.national_id || '—'}</td>
       <td>${r.student_id}</td>
       <td style="font-weight:600">${r.name}</td>
-      <td style="font-size:12px">${r.birthdate || '—'}</td>
+      <td style="font-size:12px">${r.birthdate ? formatDateTH(r.birthdate) : '—'}</td>
       <td style="font-size:12px">${r.student_status || '—'}</td>
       <td>${r.ok
         ? '<span style="color:var(--success);font-size:12px">✅ OK</span>'
