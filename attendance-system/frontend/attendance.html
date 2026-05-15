@@ -609,10 +609,31 @@ function renderTable() {
     const d = attendanceData[s.student_id] || {};
     const status = d.status || '';
     const checkedAt = d.checked_at ? new Date(d.checked_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) : '—';
+    
+    // วันเกิดและอายุ - ปรับให้อยู่ในบรรทัดเดียวกัน
+    let birthdateText = '';
+    if (s.birthdate) {
+      const bd = new Date(s.birthdate);
+      if (!isNaN(bd.getTime())) {
+        const today = new Date();
+        let age = today.getFullYear() - bd.getFullYear();
+        const monthDiff = today.getMonth() - bd.getMonth();
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < bd.getDate())) {
+          age--;
+        }
+        const thDate = bd.toLocaleDateString('th-TH', { 
+          day: 'numeric', 
+          month: 'short', 
+          year: 'numeric' 
+        });
+        birthdateText = ` | 🎂 <span style="white-space:nowrap">${thDate} (${age} ปี)</span>`;
+      }
+    }
+    
     return '<tr id="row-' + s.student_id + '" class="' + (status ? 'row-' + status : '') + '">' +
       '<td style="text-align:center;font-weight:700">' + s.number + '</td>' +
       '<td><div class="student-info">' + avatarHtml(s) +
-        '<div><div class="name">' + s.name + '</div><div class="meta">รหัส: ' + s.student_id + ' | ชั้น: ' + s.class + '</div></div>' +
+        '<div><div class="name">' + s.name + '</div><div class="meta">รหัส: ' + s.student_id + ' | ชั้น: ' + s.class + birthdateText + '</div></div>' +
       '</div></td>' +
       '<td><div class="status-group">' +
         '<button class="status-btn present ' + (status==='present'?'active':'') + '" onclick="setStatus(\'' + s.student_id + '\',\'present\')">✅ มา</button>' +
