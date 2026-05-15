@@ -313,7 +313,17 @@ function renderStats() {
 }
 
 function renderGradeTabs() {
-  const grades = ['all', ...new Set(allClasses.map(c => c.grade).filter(Boolean))];
+  // เรียงลำดับ grades ตามลำดับที่ถูกต้อง
+  const gradeOrder = ['ป.1','ป.2','ป.3','ป.4','ป.5','ป.6','ม.1','ม.2','ม.3','ม.4','ม.5','ม.6'];
+  const availableGrades = [...new Set(allClasses.map(c => c.grade).filter(Boolean))];
+  const sortedGrades = availableGrades.sort((a, b) => {
+    const aIndex = gradeOrder.indexOf(a);
+    const bIndex = gradeOrder.indexOf(b);
+    return aIndex - bIndex;
+  });
+  
+  const grades = ['all', ...sortedGrades];
+  
   document.getElementById('grade-tabs').innerHTML = grades.map(g => {
     const col = g === 'all' ? { bg: '#e0e7ff', text: '#3730a3', border: '#6366f1' } : gradeColor(g);
     const label = g === 'all' ? '📚 ทุกระดับชั้น' : `🏛️ ${g}`;
@@ -350,14 +360,30 @@ function renderClasses() {
   }
   document.getElementById('empty-state').style.display = 'none';
 
-  // Group by grade
+  // Group by grade และเรียงลำดับตาม grade และ room
   const groups = {};
   filtered.forEach(c => {
     if (!groups[c.grade]) groups[c.grade] = [];
     groups[c.grade].push(c);
   });
 
-  container.innerHTML = Object.entries(groups).map(([grade, classes]) => {
+  // เรียงลำดับ grades ตามลำดับที่ถูกต้อง
+  const gradeOrder = ['ป.1','ป.2','ป.3','ป.4','ป.5','ป.6','ม.1','ม.2','ม.3','ม.4','ม.5','ม.6'];
+  const sortedGrades = Object.keys(groups).sort((a, b) => {
+    const aIndex = gradeOrder.indexOf(a);
+    const bIndex = gradeOrder.indexOf(b);
+    return aIndex - bIndex;
+  });
+
+  container.innerHTML = sortedGrades.map(grade => {
+    const classes = groups[grade];
+    // เรียงลำดับชั้นเรียนในแต่ละ grade ตาม room number
+    classes.sort((a, b) => {
+      const roomA = parseInt(a.room) || 0;
+      const roomB = parseInt(b.room) || 0;
+      return roomA - roomB;
+    });
+    
     const col = gradeColor(grade);
     const totalStudents = classes.reduce((a, c) => a + (c.student_count || 0), 0);
     return `
