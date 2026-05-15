@@ -36,9 +36,7 @@
       <a href="classes.html"    class="nav-item admin-only" style="display:none"><span class="nav-icon">🏛️</span> จัดการชั้นเรียน</a>
       <a href="students.html"   class="nav-item"><span class="nav-icon">👨‍🎓</span> จัดการนักเรียน</a>
       <a href="qrcode.html"     class="nav-item"><span class="nav-icon">📷</span> QR Code</a>
-
-      <div class="nav-section-title">บัญชีของฉัน</div>
-      <a href="profile.html"    class="nav-item active"><span class="nav-icon">⚙️</span> ตั้งค่าการสอน</a>
+      <a href="users.html"      class="nav-item admin-only" style="display:none"><span class="nav-icon">👥</span> จัดการผู้ใช้</a>
     </nav>
     <div class="user-panel">
       <div class="user-avatar-circle" id="user-avatar">?</div>
@@ -108,8 +106,35 @@ function getTargetUserId() {
 
 async function init() {
   await new Promise(r => setTimeout(r, 200)); // wait for app.js
+  
+  // Wait for currentUser to load
+  let retries = 0;
+  while (!currentUser && retries < 50) {
+    await new Promise(r => setTimeout(r, 100));
+    retries++;
+  }
+  
+  if (!currentUser) {
+    window.location.href = '/login.html';
+    return;
+  }
 
   const targetId = getTargetUserId();
+  
+  // Only admin can access this page
+  if (currentUser.role !== 'admin') {
+    showToast('เฉพาะ Admin เท่านั้นที่สามารถตั้งค่าการสอนได้', 'error');
+    setTimeout(() => window.location.href = '/index.html', 1500);
+    return;
+  }
+  
+  // Admin must specify user_id
+  if (targetId === 'me') {
+    showToast('กรุณาระบุ user_id ที่ต้องการแก้ไข', 'warning');
+    setTimeout(() => window.location.href = '/users.html', 1500);
+    return;
+  }
+
   const isEditingOther = targetId !== 'me' && currentUser?.role === 'admin';
 
   // Update page header if editing another user

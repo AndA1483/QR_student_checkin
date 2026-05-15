@@ -37,8 +37,6 @@
       <a href="students.html"   class="nav-item"><span class="nav-icon">👨‍🎓</span> จัดการนักเรียน</a>
       <a href="qrcode.html"     class="nav-item"><span class="nav-icon">📷</span> QR Code</a>
       <a href="users.html"      class="nav-item active admin-only" style="display:none"><span class="nav-icon">👥</span> จัดการผู้ใช้</a>
-      <div class="nav-section-title">บัญชีของฉัน</div>
-      <a href="profile.html"    class="nav-item"><span class="nav-icon">⚙️</span> ตั้งค่าการสอน</a>
     </nav>
     <div class="user-panel">
       <div class="user-avatar-circle" id="user-avatar">?</div>
@@ -185,7 +183,7 @@ function renderUsers() {
       </td>
       <td style="text-align:right">
         <div style="display:flex;gap:6px;justify-content:flex-end">
-          <a href="profile.html?user_id=${u.id}" class="btn btn-primary btn-sm">⚙️ ตั้งค่าการสอน</a>
+          <button class="btn btn-primary btn-sm" onclick="openAssignModal(${u.id}, '${u.full_name.replace(/'/g,"\\'")}')">⚙️ ตั้งค่าการสอน</button>
           <button class="btn btn-outline btn-sm" onclick="openEditModal(${u.id})">✏️</button>
           <button class="btn btn-outline btn-sm" onclick="openDeleteModal(${u.id},'${u.full_name.replace(/'/g,"\\'")}')">🗑️</button>
         </div>
@@ -253,7 +251,7 @@ async function showAssignmentDetail(userId) {
   const u = allUsers.find(x => x.id === userId);
   if (!u) return;
   document.getElementById('assign-modal-title').textContent = `📚 การสอนของ ${u.full_name}`;
-  document.getElementById('assign-edit-btn').href = `profile.html?user_id=${userId}`;
+  document.getElementById('assign-edit-btn').onclick = () => openAssignModal(userId, u.full_name);
   document.getElementById('assign-modal-body').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
   openModal('assign-modal');
 
@@ -299,6 +297,13 @@ async function showAssignmentDetail(userId) {
   } catch(e) {
     document.getElementById('assign-modal-body').innerHTML = `<div style="color:var(--danger);padding:16px">โหลดข้อมูลไม่สำเร็จ</div>`;
   }
+}
+
+async function openAssignModal(userId, userName) {
+  closeModal('assign-modal');
+  
+  // Redirect to profile.html with user_id parameter
+  window.location.href = `profile.html?user_id=${userId}`;
 }
 
 loadUsers();

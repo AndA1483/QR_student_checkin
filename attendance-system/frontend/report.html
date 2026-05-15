@@ -115,8 +115,6 @@
       <a href="students.html"   class="nav-item"><span class="nav-icon">👨‍🎓</span> ข้อมูลนักเรียน</a>
       <a href="qrcode.html"     class="nav-item"><span class="nav-icon">📷</span> QR Code</a>
       <a href="users.html"      class="nav-item admin-only" style="display:none"><span class="nav-icon">👥</span> จัดการผู้ใช้</a>
-      <div class="nav-section-title">บัญชีของฉัน</div>
-      <a href="profile.html"    class="nav-item"><span class="nav-icon">⚙️</span> ตั้งค่าการสอน</a>
     </nav>
     <div class="user-panel">
       <div class="user-avatar-circle" id="user-avatar">?</div>
@@ -406,44 +404,83 @@ async function onReportTypeChange() {
   document.getElementById('subject-bar').style.display = 'none';
   
   if (reportMode === 'homeroom') {
-    // Homeroom mode
+    // Homeroom mode - both admin and teacher use dropdown
+    document.getElementById('admin-class-bar').style.display = 'flex';
+    
     if (currentUser.role === 'admin') {
-      // Admin: show class selector
-      document.getElementById('admin-class-bar').style.display = 'flex';
+      // Admin: show all classes
       await populateClassSelect('class-filter', 'เลือกชั้นเรียน');
     } else {
-      // Teacher: show their homeroom classes as cards
+      // Teacher: show only their homeroom classes
       const homerooms = currentUser.homerooms || [];
+      const sel = document.getElementById('class-filter');
+      sel.innerHTML = '<option value="">— เลือกชั้นเรียน —</option>';
+      
       if (homerooms.length > 0) {
-        document.getElementById('my-classes-label').textContent = '🏠 ชั้นเรียนประจำชั้นของฉัน';
-        document.getElementById('my-classes-grid').innerHTML = homerooms.map(h => 
-          `<button class="class-card-btn homeroom" onclick="selectClass(${h.class_id}, '${h.class_code}', '${h.class_name}', '${h.grade}', '${h.room}')">
-            <div class="class-card-code">${h.class_code}</div>
-            <div class="class-card-tags">${h.class_name}</div>
-          </button>`
-        ).join('');
-        document.getElementById('my-classes-panel').style.display = 'block';
+        // Group by grade
+        const byGrade = {};
+        homerooms.forEach(h => {
+          if (!byGrade[h.grade]) byGrade[h.grade] = [];
+          byGrade[h.grade].push(h);
+        });
+        
+        Object.entries(byGrade).sort().forEach(([grade, list]) => {
+          const grp = document.createElement('optgroup');
+          grp.label = grade;
+          list.sort((a,b) => Number(a.room) - Number(b.room)).forEach(h => {
+            const opt = document.createElement('option');
+            opt.value = h.class_id;
+            opt.textContent = `${h.class_code} – ${h.class_name}`;
+            grp.appendChild(opt);
+          });
+          sel.appendChild(grp);
+        });
+      } else {
+        // No homerooms - show message
+        sel.innerHTML = '<option value="">— ยังไม่มีห้องประจำชั้นที่รับผิดชอบ —</option>';
+        sel.disabled = true;
       }
     }
   } else if (reportMode === 'subject') {
-    // Subject mode
+    // Subject mode - both admin and teacher use dropdown
+    document.getElementById('admin-class-bar').style.display = 'flex';
+    
     if (currentUser.role === 'admin') {
-      // Admin: show class selector + subject selector
-      document.getElementById('admin-class-bar').style.display = 'flex';
+      // Admin: show all classes
       await populateClassSelect('class-filter', 'เลือกชั้นเรียน');
     } else {
-      // Teacher: show their classes as cards
+      // Teacher: show only classes where they teach subjects
       const myClasses = new Map();
       (currentUser.subjects || []).forEach(s => myClasses.set(s.class_id, s));
+      
+      const sel = document.getElementById('class-filter');
+      sel.innerHTML = '<option value="">— เลือกชั้นเรียน —</option>';
+      
       if (myClasses.size > 0) {
-        document.getElementById('my-classes-label').textContent = '🏛️ ชั้นเรียนที่สอน';
-        document.getElementById('my-classes-grid').innerHTML = Array.from(myClasses.values()).map(c => 
-          `<button class="class-card-btn" onclick="selectClass(${c.class_id}, '${c.class_code}', '${c.class_name}', '${c.grade}', '${c.room}')">
-            <div class="class-card-code">${c.class_code}</div>
-            <div class="class-card-tags">${c.class_name}</div>
-          </button>`
-        ).join('');
-        document.getElementById('my-classes-panel').style.display = 'block';
+        // Group by grade
+        const byGrade = {};
+        myClasses.forEach(c => {
+          if (!byGrade[c.grade]) byGrade[c.grade] = [];
+          if (!byGrade[c.grade].find(x => x.class_id === c.class_id)) {
+            byGrade[c.grade].push(c);
+          }
+        });
+        
+        Object.entries(byGrade).sort().forEach(([grade, list]) => {
+          const grp = document.createElement('optgroup');
+          grp.label = grade;
+          list.sort((a,b) => Number(a.room) - Number(b.room)).forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c.class_id;
+            opt.textContent = `${c.class_code} – ${c.class_name}`;
+            grp.appendChild(opt);
+          });
+          sel.appendChild(grp);
+        });
+      } else {
+        // No classes - show message
+        sel.innerHTML = '<option value="">— ยังไม่มีชั้นเรียนที่สอน —</option>';
+        sel.disabled = true;
       }
     }
   }
@@ -496,23 +533,52 @@ function selectSubject(subjectId, subjectName, icon, color) {
 
 function onClassChange() {
   const classId = document.getElementById('class-filter').value;
+  
+  console.log('onClassChange called:', { classId, reportMode, type: typeof classId });
+  
   if (classId) {
-    selectedClassId = classId;
+    selectedClassId = Number(classId); // Convert to number
     selectedSubjectId = null;
     
+    console.log('selectedClassId set to:', selectedClassId, 'type:', typeof selectedClassId);
+    
     if (reportMode === 'subject') {
-      // Show subject selector for admin
-      loadSubjects().then(subjects => {
-        document.getElementById('subject-pills').innerHTML = subjects.map(s =>
-          `<button class="subject-pill" style="color:${s.color};border-color:${s.color}" onclick="selectSubjectAdmin(${s.id}, '${s.subject_name}', '${s.icon}', '${s.color}')">
-            ${s.icon} ${s.subject_name}
-          </button>`
-        ).join('');
-        document.getElementById('subject-bar').style.display = 'flex';
-      });
+      // Show subject selector
+      if (currentUser.role === 'admin') {
+        // Admin: show all subjects
+        loadSubjects().then(subjects => {
+          document.getElementById('subject-pills').innerHTML = subjects.map(s =>
+            `<button class="subject-pill" style="color:${s.color};border-color:${s.color}" onclick="selectSubjectAdmin(${s.id}, '${s.subject_name}', '${s.icon}', '${s.color}')">
+              ${s.icon} ${s.subject_name}
+            </button>`
+          ).join('');
+          document.getElementById('subject-bar').style.display = 'flex';
+        });
+      } else {
+        // Teacher: show only subjects they teach in this class
+        const classSubjects = (currentUser.subjects || []).filter(s => s.class_id === Number(classId));
+        console.log('Teacher subjects in this class:', classSubjects);
+        if (classSubjects.length > 0) {
+          document.getElementById('subject-pills').innerHTML = classSubjects.map(s =>
+            `<button class="subject-pill" style="color:${s.color};border-color:${s.color}" onclick="selectSubjectAdmin(${s.subject_id}, '${s.subject_name}', '${s.icon}', '${s.color}')">
+              ${s.icon} ${s.subject_name}
+            </button>`
+          ).join('');
+          document.getElementById('subject-bar').style.display = 'flex';
+        } else {
+          document.getElementById('subject-bar').style.display = 'none';
+        }
+      }
     } else {
+      // Homeroom mode - load date history immediately
       loadDateHistory();
     }
+  } else {
+    // No class selected - hide subject bar
+    document.getElementById('subject-bar').style.display = 'none';
+    selectedClassId = null;
+    selectedSubjectId = null;
+    console.log('No class selected, cleared selectedClassId');
   }
 }
 
@@ -535,12 +601,25 @@ function buildQueryString(extra = {}) {
   if (selectedSubjectId) {
     p.set('subject_id', selectedSubjectId);
   }
-  if (reportMode === 'homeroom' && selectedClassId) {
-    p.set('homeroom_only', 'true');
+  
+  // Add homeroom_filter parameter based on report mode
+  if (reportMode === 'homeroom') {
+    p.set('homeroom_filter', 'homeroom');
+  } else if (reportMode === 'subject') {
+    p.set('homeroom_filter', 'subject');
   }
   
   Object.entries(extra).forEach(([k,v]) => { if (v) p.set(k, v); });
   const s = p.toString();
+  
+  // Debug log
+  console.log('buildQueryString:', {
+    reportMode,
+    selectedClassId,
+    selectedSubjectId,
+    queryString: s
+  });
+  
   return s ? '?' + s : '';
 }
 
@@ -606,6 +685,24 @@ function selectDate(date) {
 async function loadDailyReport() {
   const date = document.getElementById('report-date').value;
   if (!date) { showToast('กรุณาเลือกวันที่', 'warning'); return; }
+  
+  // Validate: if subject mode, must select class and subject
+  if (reportMode === 'subject') {
+    if (!selectedClassId) {
+      showToast('กรุณาเลือกชั้นเรียนก่อน', 'warning');
+      return;
+    }
+    if (!selectedSubjectId) {
+      showToast('กรุณาเลือกวิชาก่อน', 'warning');
+      return;
+    }
+  }
+  
+  // Validate: if homeroom mode, must select class
+  if (reportMode === 'homeroom' && !selectedClassId) {
+    showToast('กรุณาเลือกชั้นเรียนก่อน', 'warning');
+    return;
+  }
 
   document.getElementById('daily-loading').style.display = 'flex';
   document.getElementById('daily-content').style.display = 'none';
@@ -690,6 +787,24 @@ async function loadDailyReport() {
 async function loadSemesterReport(all = false) {
   const start = all ? '' : document.getElementById('sem-start').value;
   const end   = all ? '' : document.getElementById('sem-end').value;
+
+  // Validate: if subject mode, must select class and subject
+  if (reportMode === 'subject') {
+    if (!selectedClassId) {
+      showToast('กรุณาเลือกชั้นเรียนก่อน', 'warning');
+      return;
+    }
+    if (!selectedSubjectId) {
+      showToast('กรุณาเลือกวิชาก่อน', 'warning');
+      return;
+    }
+  }
+  
+  // Validate: if homeroom mode, must select class
+  if (reportMode === 'homeroom' && !selectedClassId) {
+    showToast('กรุณาเลือกชั้นเรียนก่อน', 'warning');
+    return;
+  }
 
   // Validate date range
   if (!all && start && end && start > end) {

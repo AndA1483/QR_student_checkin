@@ -15,7 +15,7 @@ function buildFilters({ class_id, subject_id }) {
 
 /**
  * For a teacher (non-admin), restrict queries to only the classes/subjects
- * they are assigned to. Returns { classIds, subjectIds, homeroomClassIds, subjectClassIds } or null for admin.
+ * they are assigned to. Returns { classIds, subjectIds, homeroomClassIds, subjectClassIds, classSubjectPairs } or null for admin.
  */
 function getTeacherScope(req) {
   if (req.session.role === 'admin') return null; // admin sees everything
@@ -25,15 +25,22 @@ function getTeacherScope(req) {
   const homeroomRows = queryAll(`SELECT class_id FROM teacher_homeroom WHERE user_id = ?`, [uid]);
   const homeroomClassIds = homeroomRows.map(r => r.class_id);
 
-  // Get subject classes
+  // Get subject classes with mapping
   const subjectRows = queryAll(`SELECT class_id, subject_id FROM teacher_subjects WHERE user_id = ?`, [uid]);
   const subjectClassIds = [...new Set(subjectRows.map(r => r.class_id))];
   const subjectIds = [...new Set(subjectRows.map(r => r.subject_id))];
+  
+  // Create map of class_id -> subject_ids that teacher teaches in that class
+  const classSubjectMap = {};
+  subjectRows.forEach(row => {
+    if (!classSubjectMap[row.class_id]) classSubjectMap[row.class_id] = [];
+    classSubjectMap[row.class_id].push(row.subject_id);
+  });
 
   // All classes (homeroom + subject)
   const classIds = [...new Set([...homeroomClassIds, ...subjectClassIds])];
 
-  return { classIds, subjectIds, homeroomClassIds, subjectClassIds, uid };
+  return { classIds, subjectIds, homeroomClassIds, subjectClassIds, classSubjectMap, uid };
 }
 
 /** Build IN clause for teacher's allowed class_ids */
@@ -185,24 +192,54 @@ router.post('/qr-checkin', (req, res) => {
 });
 
 // ── GET daily report ───────────────────────────────────────────────────────
-// ?class_id= ?subject_id=
+// ?class_id= ?subject_id= ?homeroom_filter=
 router.get('/report/daily/:date', (req, res) => {
   const { date } = req.params;
-  const { class_id, subject_id } = req.query;
+  const { class_id, subject_id, homeroom_filter } = req.query;
   const scope = getTeacherScope(req);
+
+  console.log('[Daily Report] Request params:', { date, class_id, subject_id, homeroom_filter, role: req.session.role });
+
+  // For teacher: validate access to class + subject combination
+  if (scope && class_id && subject_id) {
+    const allowedSubjects = scope.classSubjectMap[class_id] || [];
+    if (!allowedSubjects.includes(Number(subject_id))) {
+      return res.status(403).json({ error: 'ไม่มีสิทธิ์เข้าถึงข้อมูลวิชานี้ในชั้นเรียนนี้' });
+    }
+  }
 
   let classFilter = '';
   let classParams = [];
+  
+  // Priority: use class_id if provided, otherwise use scope
   if (class_id) {
+    // User selected a specific class - use it
     classFilter = 'AND s.class_id = ?';
     classParams = [class_id];
+    console.log('[Daily Report] Using specific class_id:', class_id);
+  } else if (homeroom_filter === 'homeroom') {
+    // Homeroom mode without specific class - use homeroom scope
+    if (scope && scope.homeroomClassIds && scope.homeroomClassIds.length > 0) {
+      classFilter = `AND s.class_id IN (${scope.homeroomClassIds.map(() => '?').join(',')})`;
+      classParams = scope.homeroomClassIds;
+      console.log('[Daily Report] Using homeroom scope:', scope.homeroomClassIds);
+    }
+  } else if (homeroom_filter === 'subject') {
+    // Subject mode without specific class - use subject scope
+    if (scope && scope.subjectClassIds && scope.subjectClassIds.length > 0) {
+      classFilter = `AND s.class_id IN (${scope.subjectClassIds.map(() => '?').join(',')})`;
+      classParams = scope.subjectClassIds;
+      console.log('[Daily Report] Using subject scope:', scope.subjectClassIds);
+    }
   } else if (scope) {
+    // No filter specified - use all classes in scope
     const { clause, params } = scopeClause(scope);
     classFilter = clause;
     classParams = params;
+    console.log('[Daily Report] Using all classes in scope:', scope.classIds);
   }
 
-  const subjectFilter = subject_id ? 'AND a.subject_id = ?' : '';
+  const subjectFilter = subject_id ? 'AND a.subject_id = ?' : (homeroom_filter === 'homeroom' ? 'AND (a.subject_id IS NULL OR a.id IS NULL)' : '');
   const subjectParams = subject_id ? [subject_id] : [];
 
   const statsRows = queryAll(`
@@ -217,42 +254,98 @@ router.get('/report/daily/:date', (req, res) => {
   summary.total = queryOne(`SELECT COUNT(*) as c FROM students s WHERE 1=1 ${classFilter}`, classParams).c;
   summary.percent = summary.total > 0 ? ((summary.present / summary.total) * 100).toFixed(1) : 0;
 
+  // Build JOIN condition for details query
+  let joinCondition = 's.student_id = a.student_id AND a.date = ?';
+  const detailParams = [date];
+  
+  if (subject_id) {
+    joinCondition += ' AND a.subject_id = ?';
+    detailParams.push(subject_id);
+  } else if (homeroom_filter === 'homeroom') {
+    joinCondition += ' AND a.subject_id IS NULL';
+  }
+
   const details = queryAll(`
     SELECT s.student_id, s.name, s.class, s.class_id, s.number,
            a.status, a.note, a.subject_id, a.checked_at
     FROM students s
-    LEFT JOIN attendance a
-      ON s.student_id = a.student_id AND a.date = ? ${subjectFilter}
+    LEFT JOIN attendance a ON ${joinCondition}
     WHERE 1=1 ${classFilter}
     ORDER BY s.class ASC, s.number ASC
-  `, [date, ...subjectParams, ...classParams]);
+  `, [...detailParams, ...classParams]);
 
   res.json({ date, summary, details });
 });
 
 // ── GET semester summary ───────────────────────────────────────────────────
-// ?class_id= ?subject_id= ?start= ?end=
+// ?class_id= ?subject_id= ?start= ?end= ?homeroom_filter=
 router.get('/report/semester', (req, res) => {
-  const { class_id, subject_id, start, end } = req.query;
+  const { class_id, subject_id, start, end, homeroom_filter } = req.query;
   const scope = getTeacherScope(req);
+
+  console.log('[Semester Report] Request params:', { class_id, subject_id, start, end, homeroom_filter, role: req.session.role });
+
+  // For teacher: validate access to class + subject combination
+  if (scope && class_id && subject_id) {
+    const allowedSubjects = scope.classSubjectMap[class_id] || [];
+    if (!allowedSubjects.includes(Number(subject_id))) {
+      return res.status(403).json({ error: 'ไม่มีสิทธิ์เข้าถึงข้อมูลวิชานี้ในชั้นเรียนนี้' });
+    }
+  }
 
   let classFilter = '';
   let classParams = [];
+  
+  // Priority: use class_id if provided, otherwise use scope
   if (class_id) {
+    // User selected a specific class - use it
     classFilter = 'AND s.class_id = ?';
     classParams = [class_id];
+    console.log('[Semester Report] Using specific class_id:', class_id);
+  } else if (homeroom_filter === 'homeroom') {
+    // Homeroom mode without specific class - use homeroom scope
+    if (scope && scope.homeroomClassIds && scope.homeroomClassIds.length > 0) {
+      classFilter = `AND s.class_id IN (${scope.homeroomClassIds.map(() => '?').join(',')})`;
+      classParams = scope.homeroomClassIds;
+      console.log('[Semester Report] Using homeroom scope:', scope.homeroomClassIds);
+    }
+  } else if (homeroom_filter === 'subject') {
+    // Subject mode without specific class - use subject scope
+    if (scope && scope.subjectClassIds && scope.subjectClassIds.length > 0) {
+      classFilter = `AND s.class_id IN (${scope.subjectClassIds.map(() => '?').join(',')})`;
+      classParams = scope.subjectClassIds;
+      console.log('[Semester Report] Using subject scope:', scope.subjectClassIds);
+    }
   } else if (scope) {
+    // No filter specified - use all classes in scope
     const { clause, params } = scopeClause(scope);
     classFilter = clause;
     classParams = params;
+    console.log('[Semester Report] Using all classes in scope:', scope.classIds);
   }
 
-  const subjectFilter = subject_id ? 'AND a.subject_id = ?' : '';
+  const subjectFilter = subject_id ? 'AND a.subject_id = ?' : (homeroom_filter === 'homeroom' ? 'AND (a.subject_id IS NULL OR a.id IS NULL)' : '');
   const subjectParams = subject_id ? [subject_id] : [];
 
   let dateFilter = '';
   const dateParams = [];
   if (start && end) { dateFilter = 'AND a.date BETWEEN ? AND ?'; dateParams.push(start, end); }
+
+  // Build JOIN condition
+  let joinCondition = 's.student_id = a.student_id';
+  const joinParams = [];
+  
+  if (subject_id) {
+    joinCondition += ' AND a.subject_id = ?';
+    joinParams.push(subject_id);
+  } else if (homeroom_filter === 'homeroom') {
+    joinCondition += ' AND a.subject_id IS NULL';
+  }
+  
+  if (start && end) {
+    joinCondition += ' AND a.date BETWEEN ? AND ?';
+    joinParams.push(start, end);
+  }
 
   const rows = queryAll(`
     SELECT s.student_id, s.name, s.class, s.class_id, s.number, s.photo, c.class_name,
@@ -262,11 +355,11 @@ router.get('/report/semester', (req, res) => {
       SUM(CASE WHEN a.status='leave'   THEN 1 ELSE 0 END) as leave
     FROM students s
     LEFT JOIN classes c ON s.class_id = c.id
-    LEFT JOIN attendance a ON s.student_id = a.student_id ${subjectFilter} ${dateFilter}
+    LEFT JOIN attendance a ON ${joinCondition}
     WHERE 1=1 ${classFilter}
     GROUP BY s.student_id
     ORDER BY s.class ASC, s.number ASC
-  `, [...subjectParams, ...dateParams, ...classParams]);
+  `, [...joinParams, ...classParams]);
 
   res.json(rows.map(r => ({
     ...r, present: r.present||0, absent: r.absent||0, leave: r.leave||0,

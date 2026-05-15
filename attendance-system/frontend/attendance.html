@@ -113,8 +113,6 @@
       <a href="students.html" class="nav-item"><span class="nav-icon">👨‍🎓</span> ข้อมูลนักเรียน</a>
       <a href="qrcode.html" class="nav-item"><span class="nav-icon">📷</span> QR Code</a>
       <a href="users.html" class="nav-item admin-only" style="display:none"><span class="nav-icon">👥</span> จัดการผู้ใช้</a>
-      <div class="nav-section-title">บัญชีของฉัน</div>
-      <a href="profile.html" class="nav-item"><span class="nav-icon">⚙️</span> ตั้งค่าการสอน</a>
     </nav>
     <div class="user-panel">
       <div class="user-avatar-circle" id="user-avatar">?</div>
@@ -224,7 +222,6 @@
             <div class="ps-icon">⚙️</div>
             <p style="font-size:15px;font-weight:700;margin-bottom:6px" id="prompt-no-assign-title">ยังไม่มีชั้นเรียนประจำชั้น</p>
             <p style="font-size:13px" id="prompt-no-assign-text">กรุณาติดต่อ Admin เพื่อมอบหมายชั้นเรียนประจำชั้น</p>
-            <a href="profile.html" class="btn btn-primary" style="margin-top:16px">⚙️ ตั้งค่าการสอน</a>
           </div>
         </div>
       </div>
@@ -660,7 +657,24 @@ function updateSummary() {
   document.getElementById('cnt-absent').textContent = absent;
   document.getElementById('cnt-leave').textContent = leave;
   document.getElementById('cnt-percent').textContent = pct;
-  document.getElementById('save-info').textContent = 'เช็กแล้ว ' + (present+absent+leave) + '/' + total + ' คน';
+  
+  // อัพเดทข้อความใน save bar
+  let saveInfoText = '';
+  if (total === 0) {
+    saveInfoText = 'เลือกชั้นเรียนและสถานะนักเรียน แล้วกดบันทึก';
+  } else {
+    const checkedCount = present + absent + leave;
+    let typeText = '';
+    if (attendanceType === 'homeroom') {
+      typeText = 'ประจำชั้น';
+    } else if (attendanceType === 'subject' && selectedSubjectId) {
+      const subjects = availableSubjects || [];
+      const selectedSubject = subjects.find(s => (s.subject_id || s.id) === selectedSubjectId);
+      typeText = selectedSubject ? selectedSubject.subject_name : 'รายวิชา';
+    }
+    saveInfoText = `เช็กแล้ว ${checkedCount}/${total} คน${typeText ? ' (' + typeText + ')' : ''}`;
+  }
+  document.getElementById('save-info').textContent = saveInfoText;
 }
 
 async function saveAttendance() {
@@ -695,6 +709,18 @@ async function saveAttendance() {
 }
 
 function showSavePopup(stats, date) {
+  // สร้างข้อความแสดงประเภทการเช็กชื่อ
+  let typeText = '';
+  if (attendanceType === 'homeroom') {
+    typeText = '🏠 ประจำชั้น';
+  } else if (attendanceType === 'subject' && selectedSubjectId) {
+    const subjects = availableSubjects || [];
+    const selectedSubject = subjects.find(s => (s.subject_id || s.id) === selectedSubjectId);
+    typeText = selectedSubject ? `${selectedSubject.icon} ${selectedSubject.subject_name}` : '📚 รายวิชา';
+  } else {
+    typeText = '📚 รายวิชา';
+  }
+  
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay show';
   overlay.innerHTML =
@@ -703,7 +729,7 @@ function showSavePopup(stats, date) {
     '<div style="font-size:48px;margin-bottom:10px">✅</div>' +
     '<h2 style="font-size:18px;font-weight:800;margin-bottom:4px">บันทึกข้อมูลเรียบร้อย</h2>' +
     '<p style="color:var(--gray-500);font-size:13px;margin-bottom:4px">' + formatThaiDate(date) + '</p>' +
-    '<p style="color:var(--primary);font-size:13px;font-weight:700;margin-bottom:16px">🏠 ประจำชั้น</p>' +
+    '<p style="color:var(--primary);font-size:13px;font-weight:700;margin-bottom:16px">' + typeText + '</p>' +
     '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:16px">' +
     '<div style="background:var(--success-light);border-radius:10px;padding:12px"><div style="font-size:22px;font-weight:800;color:var(--success)">' + stats.present + '</div><div style="font-size:11px;color:var(--success)">มาเรียน</div></div>' +
     '<div style="background:var(--danger-light);border-radius:10px;padding:12px"><div style="font-size:22px;font-weight:800;color:var(--danger)">' + stats.absent + '</div><div style="font-size:11px;color:var(--danger)">ขาดเรียน</div></div>' +
@@ -718,15 +744,48 @@ function showSavePopup(stats, date) {
   overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
 }
 
+function updateQrScannerInfo() {
+  const modalTitle = document.getElementById('qr-modal-title');
+  
+  if (attendanceType === 'homeroom') {
+    modalTitle.textContent = '📷 สแกน QR Code เช็กชื่อประจำชั้น';
+  } else {
+    const subjects = availableSubjects || [];
+    const selectedSubject = subjects.find(s => (s.subject_id || s.id) === selectedSubjectId);
+    if (selectedSubject) {
+      modalTitle.textContent = `📷 สแกน QR Code เช็กชื่อ ${selectedSubject.icon} ${selectedSubject.subject_name}`;
+    } else {
+      modalTitle.textContent = '📷 สแกน QR Code เช็กชื่อรายวิชา';
+    }
+  }
+}
+
 function openQrScanner() {
+  // ตรวจสอบว่าได้เลือกชั้นเรียนแล้วหรือไม่
+  const classId = getCurrentClassId();
+  if (!classId) {
+    showToast('กรุณาเลือกชั้นเรียนก่อนสแกน QR Code', 'error');
+    return;
+  }
+  
+  // ตรวจสอบว่าได้เลือกรายวิชาแล้วหรือไม่ (สำหรับประเภทรายวิชา)
+  if (attendanceType === 'subject' && !selectedSubjectId) {
+    showToast('กรุณาเลือกรายวิชาก่อนสแกน QR Code', 'error');
+    return;
+  }
+  
   const today = getTodayISO();
   const qrDate = document.getElementById('qr-scan-date');
   qrDate.value = document.getElementById('date-picker').value || today;
   qrDate.max = today;
   
+  // อัพเดทข้อมูลที่แสดงใน QR scanner modal
+  updateQrScannerInfo();
+  
   if (attendanceType === 'subject') {
     qrSelectedSubjectId = selectedSubjectId;
-    document.getElementById('qr-subject-row').style.display = 'none';
+    document.getElementById('qr-subject-row').style.display = 'flex';
+    buildQrSubjectPills();
   } else {
     document.getElementById('qr-subject-row').style.display = 'none';
     qrSelectedSubjectId = null;
@@ -738,13 +797,18 @@ function openQrScanner() {
 function buildQrSubjectPills() {
   const pills = document.getElementById('qr-subject-pills');
   qrSelectedSubjectId = selectedSubjectId;
-  let html = availableSubjects.map(s => {
-    const sid = s.subject_id || s.id;
-    const isActive = String(qrSelectedSubjectId) === String(sid);
-    return `<button class="subject-pill ${isActive ? 'active' : ''}" id="qrpill-${sid}" onclick="selectQrSubject(${sid},'${sid}')"
-      style="background:${s.color}22;color:${s.color};font-size:12px;padding:4px 12px">${s.icon} ${s.subject_name}</button>`;
-  }).join('');
-  pills.innerHTML = html;
+  
+  if (attendanceType === 'subject' && selectedSubjectId) {
+    // แสดงเฉพาะวิชาที่เลือกไว้
+    const subjects = availableSubjects || [];
+    const selectedSubject = subjects.find(s => (s.subject_id || s.id) === selectedSubjectId);
+    if (selectedSubject) {
+      const html = `<button class="subject-pill active" style="background:${selectedSubject.color}22;color:${selectedSubject.color};font-size:12px;padding:6px 14px;border-radius:20px;border:1px solid ${selectedSubject.color};cursor:default">${selectedSubject.icon} ${selectedSubject.subject_name}</button>`;
+      pills.innerHTML = html;
+    }
+  } else {
+    pills.innerHTML = '';
+  }
 }
 
 function selectQrSubject(subjectId, pillKey) {
@@ -805,8 +869,19 @@ async function onAttScanSuccess(decodedText) {
       body.subject_id = qrSelectedSubjectId;
     }
     const result = await apiFetch('/attendance/qr-checkin', { method: 'POST', body: JSON.stringify(body) });
-    showAttScanResult(true, result.student.name, `รหัส: ${result.student.student_id} | ชั้น: ${result.student.class}`);
-    addAttScanLog(result.student, true);
+    
+    // สร้างข้อความแสดงประเภทการเช็กชื่อ
+    let typeText = '';
+    if (attendanceType === 'homeroom') {
+      typeText = 'ประจำชั้น';
+    } else if (attendanceType === 'subject' && qrSelectedSubjectId) {
+      const subjects = availableSubjects || [];
+      const selectedSubject = subjects.find(s => (s.subject_id || s.id) === qrSelectedSubjectId);
+      typeText = selectedSubject ? `${selectedSubject.icon} ${selectedSubject.subject_name}` : 'รายวิชา';
+    }
+    
+    showAttScanResult(true, result.student.name, `รหัส: ${result.student.student_id} | ชั้น: ${result.student.class} | ${typeText}`);
+    addAttScanLog(result.student, true, typeText);
     playAttBeep(true);
     const sid = result.student.student_id;
     if (attendanceData[sid] !== undefined) {
@@ -838,16 +913,18 @@ function showAttScanResult(success, name, meta) {
   setTimeout(() => { el.className = 'qr-scan-result'; }, 4000);
 }
 
-function addAttScanLog(student, success) {
+function addAttScanLog(student, success, typeText = '') {
   const now = new Date();
   const time = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`;
-  attScanLog.unshift({ student, success, time });
+  attScanLog.unshift({ student, success, time, typeText });
   document.getElementById('qr-log-count').textContent = attScanLog.length;
   document.getElementById('qr-scan-log').innerHTML = attScanLog.map(l =>
     `<div class="qr-scan-log-item">
       <span>${l.success ? '✅' : '❌'}</span>
-      <span style="flex:1;font-weight:600">${l.student.name}</span>
-      <span style="font-size:12px;color:var(--gray-500)">${l.student.student_id}</span>
+      <div style="flex:1">
+        <div style="font-weight:600">${l.student.name}</div>
+        <div style="font-size:11px;color:var(--gray-500)">${l.student.student_id}${l.typeText ? ' | ' + l.typeText : ''}</div>
+      </div>
       <span class="qr-scan-log-time">${l.time}</span>
     </div>`
   ).join('');

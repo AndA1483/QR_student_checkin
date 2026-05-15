@@ -82,8 +82,6 @@
       <a href="students.html"   class="nav-item active"><span class="nav-icon">👨‍🎓</span> ข้อมูลนักเรียน</a>
       <a href="qrcode.html"     class="nav-item"><span class="nav-icon">📷</span> QR Code</a>
       <a href="users.html"      class="nav-item admin-only" style="display:none"><span class="nav-icon">👥</span> จัดการผู้ใช้</a>
-      <div class="nav-section-title">บัญชีของฉัน</div>
-      <a href="profile.html"    class="nav-item"><span class="nav-icon">⚙️</span> ตั้งค่าการสอน</a>
     </nav>
     <div class="user-panel">
       <div class="user-avatar-circle" id="user-avatar">?</div>
@@ -332,12 +330,16 @@ async function loadStudents() {
   const classId = getSelectedClassId('class-filter');
   const q = classQuery(classId);
   
+  console.log('Loading students with query:', q);
+  
   // Show loading state
   document.getElementById('loading-state').style.display = 'block';
   document.getElementById('empty-state').style.display = 'none';
+  document.getElementById('students-container').innerHTML = '';
   
   try {
     allStudents = await apiFetch(`/students${q}`);
+    console.log('Loaded students:', allStudents.length, 'students');
     renderStudents(allStudents);
   } catch (e) {
     console.error('Load students error:', e);
@@ -632,10 +634,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   const urlClassId = getUrlClassId();
   if (urlClassId) document.getElementById('class-filter').value = urlClassId;
-  onClassChange();
   
   // Load students on page load
-  loadStudents();
+  await loadStudents();
 });
 
 // ══════════════════════════════════════════════════════════════════════════
