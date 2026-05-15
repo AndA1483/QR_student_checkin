@@ -266,6 +266,7 @@
           <b>📋 รูปแบบ CSV ที่รองรับ:</b><br>
           คอลัมน์: <code style="background:white;padding:2px 6px;border-radius:4px;font-size:12px">ลำดับ, เลขประจำตัวประชาชน, เลขประจำตัวนักเรียน, ชื่อ-นามสกุล, ว.ด.ป.เกิด, สถานะนักเรียน</code><br>
           <span style="color:var(--gray-400);font-size:12px">คอลัมน์ที่จำเป็น: ลำดับ, เลขประจำตัวนักเรียน, ชื่อ-นามสกุล — ที่เหลือเว้นว่างได้</span><br>
+          <span style="color:var(--primary);font-size:12px;margin-top:4px;display:block">📅 รูปแบบวันเกิด: <code style="background:white;padding:2px 6px;border-radius:4px">2 ส.ค. 2555</code>, <code style="background:white;padding:2px 6px;border-radius:4px">15/06/2553</code>, <code style="background:white;padding:2px 6px;border-radius:4px">2010-06-15</code></span><br>
           <button class="btn btn-outline btn-sm" style="margin-top:8px" onclick="downloadTemplate()">⬇️ ดาวน์โหลด Template</button>
         </div>
       </div>
@@ -803,7 +804,41 @@ function parseDateTH(str) {
   // รูปแบบ YYYY-MM-DD อยู่แล้ว
   if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
   
-  // รองรับรูปแบบต่างๆ: DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY
+  // แผนที่เดือนภาษาไทย
+  const thaiMonths = {
+    'ม.ค.': 1, 'มกราคม': 1, 'ก.พ.': 2, 'กุมภาพันธ์': 2,
+    'มี.ค.': 3, 'มีนาคม': 3, 'เม.ย.': 4, 'เมษายน': 4,
+    'พ.ค.': 5, 'พฤษภาคม': 5, 'มิ.ย.': 6, 'มิถุนายน': 6,
+    'ก.ค.': 7, 'กรกฎาคม': 7, 'ส.ค.': 8, 'สิงหาคม': 8,
+    'ก.ย.': 9, 'กันยายน': 9, 'ต.ค.': 10, 'ตุลาคม': 10,
+    'พ.ย.': 11, 'พฤศจิกายน': 11, 'ธ.ค.': 12, 'ธันวาคม': 12
+  };
+  
+  // รูปแบบภาษาไทย: "2 ส.ค. 2555" หรือ "2 สิงหาคม 2555"
+  const thaiPattern = /^(\d{1,2})\s*([ก-ฮ\.]+)\s*(\d{4})$/;
+  const thaiMatch = str.trim().match(thaiPattern);
+  if (thaiMatch) {
+    const [, day, monthStr, year] = thaiMatch;
+    const month = thaiMonths[monthStr.trim()];
+    if (month) {
+      let y = parseInt(year);
+      // แปลง พ.ศ. เป็น ค.ศ.
+      if (y > 2500) y -= 543;
+      const d = parseInt(day);
+      
+      // ตรวจสอบความถูกต้อง
+      if (month >= 1 && month <= 12 && d >= 1 && d <= 31) {
+        const date = new Date(y, month - 1, d);
+        if (date.getFullYear() === y && 
+            date.getMonth() === month - 1 && 
+            date.getDate() === d) {
+          return `${y}-${month.toString().padStart(2,'0')}-${d.toString().padStart(2,'0')}`;
+        }
+      }
+    }
+  }
+  
+  // รองรับรูปแบบตัวเลข: DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY
   const patterns = [
     /^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})$/,  // dd/mm/yyyy
     /^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2})$/,   // dd/mm/yy
