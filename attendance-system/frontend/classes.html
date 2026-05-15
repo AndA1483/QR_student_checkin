@@ -211,12 +211,15 @@ function gradeColor(grade) {
 
 async function loadPageClasses() {
   try {
+    document.getElementById('loading-state').style.display = 'flex';
     allClasses = await apiFetch('/classes');
     renderStats();
     renderGradeTabs();
     renderClasses();
+    document.getElementById('loading-state').style.display = 'none';
   } catch (e) {
-    showToast('โหลดข้อมูลไม่สำเร็จ', 'error');
+    document.getElementById('loading-state').style.display = 'none';
+    showToast('โหลดข้อมูลไม่สำเร็จ: ' + e.message, 'error');
   }
 }
 
@@ -225,26 +228,88 @@ function renderStats() {
   const totalStudents = allClasses.reduce((a, c) => a + (c.student_count || 0), 0);
   const grades = [...new Set(allClasses.map(c => c.grade).filter(Boolean))];
 
-  // Per-grade stats
-  const gradeStats = grades.map(g => {
+  // Filter stats based on active grade
+  const filteredClasses = activeGrade === 'all' 
+    ? allClasses 
+    : allClasses.filter(c => c.grade === activeGrade);
+  
+  const filteredTotal = filteredClasses.length;
+  const filteredStudents = filteredClasses.reduce((a, c) => a + (c.student_count || 0), 0);
+
+  // Main stats (filtered)
+  let mainStats = '';
+  if (activeGrade === 'all') {
+    mainStats = `
+      <div class="stat-card">
+        <div class="stat-icon blue">🏛️</div>
+        <div class="stat-info">
+          <div class="stat-value">${total}</div>
+          <div class="stat-label">ห้องเรียนทั้งหมด</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon green">👨‍🎓</div>
+        <div class="stat-info">
+          <div class="stat-value">${totalStudents}</div>
+          <div class="stat-label">นักเรียนทั้งหมด</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon purple">📚</div>
+        <div class="stat-info">
+          <div class="stat-value">${grades.length}</div>
+          <div class="stat-label">ระดับชั้น</div>
+        </div>
+      </div>`;
+  } else {
+    const col = gradeColor(activeGrade);
+    mainStats = `
+      <div class="stat-card" style="border-left: 4px solid ${col.border}">
+        <div class="stat-icon" style="background:${col.bg}">
+          <span style="font-size:20px;color:${col.text}">🏛️</span>
+        </div>
+        <div class="stat-info">
+          <div class="stat-value" style="color:${col.text}">${filteredTotal}</div>
+          <div class="stat-label">ห้องเรียน ${activeGrade}</div>
+        </div>
+      </div>
+      <div class="stat-card" style="border-left: 4px solid ${col.border}">
+        <div class="stat-icon" style="background:${col.bg}">
+          <span style="font-size:20px;color:${col.text}">👨‍🎓</span>
+        </div>
+        <div class="stat-info">
+          <div class="stat-value" style="color:${col.text}">${filteredStudents}</div>
+          <div class="stat-label">นักเรียน ${activeGrade}</div>
+        </div>
+      </div>
+      <div class="stat-card" style="border-left: 4px solid ${col.border}">
+        <div class="stat-icon" style="background:${col.bg}">
+          <span style="font-size:20px;color:${col.text}">📊</span>
+        </div>
+        <div class="stat-info">
+          <div class="stat-value" style="color:${col.text}">${filteredTotal > 0 ? Math.round(filteredStudents / filteredTotal) : 0}</div>
+          <div class="stat-label">เฉลี่ย/ห้อง</div>
+        </div>
+      </div>`;
+  }
+
+  // Per-grade stats (only show when viewing all)
+  const gradeStats = activeGrade === 'all' ? grades.map(g => {
     const cls = allClasses.filter(c => c.grade === g);
     const students = cls.reduce((a, c) => a + (c.student_count || 0), 0);
     const col = gradeColor(g);
-    return `<div class="stat-card">
-      <div class="stat-icon" style="background:${col.bg}"><span style="font-size:20px">🏛️</span></div>
+    return `<div class="stat-card" onclick="setGrade('${g}')" style="cursor:pointer;transition:transform 0.2s" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='translateY(0)'">
+      <div class="stat-icon" style="background:${col.bg}">
+        <span style="font-size:20px;color:${col.text}">🏛️</span>
+      </div>
       <div class="stat-info">
         <div class="stat-value" style="color:${col.text}">${students}</div>
         <div class="stat-label">${g} (${cls.length} ห้อง)</div>
       </div>
     </div>`;
-  }).join('');
+  }).join('') : '';
 
-  document.getElementById('class-stats').innerHTML = `
-    <div class="stat-card"><div class="stat-icon blue">🏛️</div><div class="stat-info"><div class="stat-value">${total}</div><div class="stat-label">ห้องเรียนทั้งหมด</div></div></div>
-    <div class="stat-card"><div class="stat-icon green">👨‍🎓</div><div class="stat-info"><div class="stat-value">${totalStudents}</div><div class="stat-label">นักเรียนทั้งหมด</div></div></div>
-    <div class="stat-card"><div class="stat-icon purple">📚</div><div class="stat-info"><div class="stat-value">${grades.length}</div><div class="stat-label">ระดับชั้น</div></div></div>
-    ${gradeStats}
-  `;
+  document.getElementById('class-stats').innerHTML = mainStats + gradeStats;
 }
 
 function renderGradeTabs() {
@@ -265,6 +330,7 @@ function renderGradeTabs() {
 
 function setGrade(grade) {
   activeGrade = grade;
+  renderStats();
   renderGradeTabs();
   renderClasses();
 }
