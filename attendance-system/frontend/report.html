@@ -220,7 +220,7 @@
             <div class="card-body" style="padding:0">
               <div class="table-wrapper">
                 <table>
-                  <thead><tr><th>เลขที่</th><th>ชื่อ-สกุล</th><th>ชั้น</th><th>สถานะ</th><th>หมายเหตุ</th><th>เวลาเช็ก</th></tr></thead>
+                  <thead><tr><th>เลขที่</th><th>ชื่อ-สกุล</th><th>ชั้น</th><th>วันเกิด</th><th>สถานะ</th><th>หมายเหตุ</th><th>เวลาเช็ก</th></tr></thead>
                   <tbody id="daily-tbody"></tbody>
                 </table>
               </div>
@@ -273,10 +273,10 @@
             <div class="table-wrapper">
               <table>
                 <thead>
-                  <tr><th>เลขที่</th><th>ชื่อ-สกุล</th><th>ชั้น</th><th>มาเรียน</th><th>ขาด</th><th>ลา</th><th>รวมวัน</th><th>% เข้าเรียน</th></tr>
+                  <tr><th>เลขที่</th><th>ชื่อ-สกุล</th><th>ชั้น</th><th>วันเกิด</th><th>มาเรียน</th><th>ขาด</th><th>ลา</th><th>รวมวัน</th><th>% เข้าเรียน</th></tr>
                 </thead>
                 <tbody id="sem-tbody">
-                  <tr><td colspan="8" style="text-align:center;padding:32px;color:var(--gray-400)">กรุณาเลือกช่วงเวลาแล้วกดค้นหา</td></tr>
+                  <tr><td colspan="9" style="text-align:center;padding:32px;color:var(--gray-400)">กรุณาเลือกช่วงเวลาแล้วกดค้นหา</td></tr>
                 </tbody>
               </table>
             </div>
@@ -765,10 +765,32 @@ async function loadDailyReport() {
     document.getElementById('daily-tbody').innerHTML = data.details.map(r => {
       const rowClass = r.status ? 'row-' + r.status : '';
       const time = r.checked_at ? new Date(r.checked_at).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'}) : '—';
+      
+      // วันเกิดและอายุ
+      let birthdateHtml = '—';
+      if (r.birthdate) {
+        const bd = new Date(r.birthdate);
+        if (!isNaN(bd.getTime())) {
+          const today = new Date();
+          let age = today.getFullYear() - bd.getFullYear();
+          const monthDiff = today.getMonth() - bd.getMonth();
+          if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < bd.getDate())) {
+            age--;
+          }
+          const thDate = bd.toLocaleDateString('th-TH', { 
+            day: 'numeric', 
+            month: 'short', 
+            year: 'numeric' 
+          });
+          birthdateHtml = '🎂 ' + thDate + ' (' + age + ' ปี)';
+        }
+      }
+      
       return '<tr class="' + rowClass + '">' +
         '<td style="text-align:center;font-weight:700">' + r.number + '</td>' +
         '<td><b>' + r.name + '</b></td>' +
         '<td><span class="class-badge" style="font-size:12px">' + r.class + '</span></td>' +
+        '<td style="font-size:13px;color:var(--gray-600)">' + birthdateHtml + '</td>' +
         '<td>' + statusBadge(r.status) + '</td>' +
         '<td style="font-size:13px;color:var(--gray-600)">' + (r.note || '—') + '</td>' +
         '<td style="font-size:13px;color:var(--gray-500)">' + time + '</td>' +
@@ -857,17 +879,39 @@ async function loadSemesterReport(all = false) {
 function renderSemesterTable(data) {
   const tbody = document.getElementById('sem-tbody');
   if (data.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--gray-400)">ไม่พบข้อมูล</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--gray-400)">ไม่พบข้อมูล</td></tr>';
     return;
   }
   tbody.innerHTML = data.map(r => {
     const pct = parseFloat(r.percent || 0);
     const cls = percentClass(pct);
+    
+    // วันเกิดและอายุ
+    let birthdateHtml = '—';
+    if (r.birthdate) {
+      const bd = new Date(r.birthdate);
+      if (!isNaN(bd.getTime())) {
+        const today = new Date();
+        let age = today.getFullYear() - bd.getFullYear();
+        const monthDiff = today.getMonth() - bd.getMonth();
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < bd.getDate())) {
+          age--;
+        }
+        const thDate = bd.toLocaleDateString('th-TH', { 
+          day: 'numeric', 
+          month: 'short', 
+          year: 'numeric' 
+        });
+        birthdateHtml = '🎂 ' + thDate + ' (' + age + ' ปี)';
+      }
+    }
+    
     return '<tr>' +
       '<td style="text-align:center;font-weight:700">' + r.number + '</td>' +
       '<td><div style="display:flex;align-items:center;gap:8px">' + avatarHtml(r) +
         '<div><div style="font-weight:600">' + r.name + '</div><div style="font-size:12px;color:var(--gray-500)">' + r.student_id + '</div></div></div></td>' +
       '<td><span class="class-badge" style="font-size:12px">' + r.class + '</span></td>' +
+      '<td style="font-size:13px;color:var(--gray-600)">' + birthdateHtml + '</td>' +
       '<td><span class="badge badge-present">' + (r.present||0) + '</span></td>' +
       '<td><span class="badge badge-absent">' + (r.absent||0) + '</span></td>' +
       '<td><span class="badge badge-leave">' + (r.leave||0) + '</span></td>' +
@@ -1024,16 +1068,37 @@ async function exportDailyExcel() {
     aoa.push([]); // เว้นบรรทัด
 
     // แถว header ตาราง
-    const headerRow = ['เลขที่', 'ชื่อ-สกุล', 'ชั้น', 'สถานะ', 'หมายเหตุ', 'เวลาเช็ก'];
+    const headerRow = ['เลขที่', 'ชื่อ-สกุล', 'ชั้น', 'วันเกิด', 'สถานะ', 'หมายเหตุ', 'เวลาเช็ก'];
     aoa.push(headerRow);
     const headerRowIdx = aoa.length - 1;
 
     // แถวข้อมูล
     data.details.forEach(r => {
+      // วันเกิดและอายุ
+      let birthdateText = '—';
+      if (r.birthdate) {
+        const bd = new Date(r.birthdate);
+        if (!isNaN(bd.getTime())) {
+          const today = new Date();
+          let age = today.getFullYear() - bd.getFullYear();
+          const monthDiff = today.getMonth() - bd.getMonth();
+          if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < bd.getDate())) {
+            age--;
+          }
+          const thDate = bd.toLocaleDateString('th-TH', { 
+            day: 'numeric', 
+            month: 'short', 
+            year: 'numeric' 
+          });
+          birthdateText = thDate + ' (' + age + ' ปี)';
+        }
+      }
+      
       aoa.push([
         r.number,
         r.name,
         r.class,
+        birthdateText,
         statusText(r.status),
         r.note || '—',
         r.checked_at
@@ -1050,6 +1115,7 @@ async function exportDailyExcel() {
       { wch: 8  },  // เลขที่
       { wch: 32 },  // ชื่อ-สกุล
       { wch: 10 },  // ชั้น
+      { wch: 22 },  // วันเกิด
       { wch: 12 },  // สถานะ
       { wch: 30 },  // หมายเหตุ
       { wch: 10 },  // เวลาเช็ก
@@ -1132,17 +1198,38 @@ async function exportSemesterExcel() {
     aoa.push([]);
 
     // header ตาราง
-    const headerRow = ['เลขที่', 'รหัสนักเรียน', 'ชื่อ-นามสกุล', 'ชั้น', 'มาเรียน', 'ขาดเรียน', 'ลา', 'รวมวัน', '% เข้าเรียน'];
+    const headerRow = ['เลขที่', 'รหัสนักเรียน', 'ชื่อ-นามสกุล', 'ชั้น', 'วันเกิด', 'มาเรียน', 'ขาดเรียน', 'ลา', 'รวมวัน', '% เข้าเรียน'];
     aoa.push(headerRow);
     const headerRowIdx = aoa.length - 1;
 
     // ข้อมูล
     semesterData.forEach(r => {
+      // วันเกิดและอายุ
+      let birthdateText = '—';
+      if (r.birthdate) {
+        const bd = new Date(r.birthdate);
+        if (!isNaN(bd.getTime())) {
+          const today = new Date();
+          let age = today.getFullYear() - bd.getFullYear();
+          const monthDiff = today.getMonth() - bd.getMonth();
+          if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < bd.getDate())) {
+            age--;
+          }
+          const thDate = bd.toLocaleDateString('th-TH', { 
+            day: 'numeric', 
+            month: 'short', 
+            year: 'numeric' 
+          });
+          birthdateText = thDate + ' (' + age + ' ปี)';
+        }
+      }
+      
       aoa.push([
         r.number,
         r.student_id,
         r.name,
         r.class,
+        birthdateText,
         r.present    || 0,
         r.absent     || 0,
         r.leave      || 0,
@@ -1159,6 +1246,7 @@ async function exportSemesterExcel() {
       { wch: 14 },  // รหัส
       { wch: 32 },  // ชื่อ
       { wch: 10 },  // ชั้น
+      { wch: 22 },  // วันเกิด
       { wch: 10 },  // มา
       { wch: 10 },  // ขาด
       { wch: 8  },  // ลา
