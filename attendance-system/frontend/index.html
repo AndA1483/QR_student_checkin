@@ -258,7 +258,10 @@ function renderMyClasses() {
 
 async function loadDashboard() {
   const classId = getSelectedClassId('class-filter');
-  const q = classQuery(classId);
+  
+  // Build query: only send class_id if explicitly selected
+  // For teacher with no selection, backend will use scope automatically
+  const q = classId ? classQuery(classId) : '';
 
   document.getElementById('qa-attend').href = `attendance.html${q}`;
   document.getElementById('qa-report').href = `report.html${q}`;
